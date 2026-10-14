@@ -41,12 +41,8 @@
       font-weight: 600;
     }
 
-    input[type="file"],
     textarea {
       width: 100%;
-    }
-
-    textarea {
       min-height: 120px;
       padding: 12px;
       border: 1px solid #ccc;
@@ -76,7 +72,6 @@
       color: white;
       font-size: 16px;
       font-weight: 600;
-      cursor: pointer;
     }
 
     button:disabled {
@@ -164,19 +159,25 @@ generateButton.addEventListener("click", async () => {
   const prompt = document.getElementById("prompt").value;
 
   generateButton.disabled = true;
-  status.textContent = "動画を生成しています…";
+  status.textContent = "画像を準備しています…";
   result.innerHTML = "";
 
   try {
 
-    const formData = new FormData();
+    // 画像をBase64に変換
+    const imageBase64 = await fileToBase64(selectedImage);
 
-    formData.append("image", selectedImage);
-    formData.append("prompt", prompt);
+    status.textContent = "動画を生成しています…";
 
     const response = await fetch("/api/generate", {
       method: "POST",
-      body: formData
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        image: imageBase64,
+        prompt: prompt
+      })
     });
 
     const data = await response.json();
@@ -185,18 +186,17 @@ generateButton.addEventListener("click", async () => {
       throw new Error(data.error || "生成に失敗しました。");
     }
 
-    if (data.video_url) {
-      status.textContent = "生成完了";
-
-      result.innerHTML = `
-        <video controls autoplay>
-          <source src="${data.video_url}" type="video/mp4">
-        </video>
-      `;
-    } else {
-      status.textContent = "生成結果を取得しましたが、動画URLがありません。";
-      console.log(data);
+    if (!data.video_url) {
+      throw new Error("生成された動画が見つかりません。");
     }
+
+    status.textContent = "生成完了";
+
+    result.innerHTML = `
+      <video controls autoplay playsinline>
+        <source src="${data.video_url}" type="video/mp4">
+      </video>
+    `;
 
   } catch (error) {
 
@@ -209,6 +209,27 @@ generateButton.addEventListener("click", async () => {
 
   }
 });
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = reader.result;
+
+      // data:image/jpeg;base64,... の
+      // "data:image/jpeg;base64," 部分を除去
+      const base64 = result.split(",")[1];
+
+      resolve(base64);
+    };
+
+    reader.onerror = reject;
+
+    reader.readAsDataURL(file);
+  });
+}
 </script>
 
 </body>
