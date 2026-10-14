@@ -32,18 +32,17 @@ export default async function handler(req, res) {
           "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          body: JSON.stringify({
-            input: {
-              action: "h3_generate",
-              image: "test",
-              prompt: "test",
-              width: 768,
-              height: 736,
-              length: 124,
-              steps: 8,
-              seed: 12345
-            }
-          })
+          input: {
+            action: "h3_generate",
+            image: "test",
+            prompt: "test",
+            width: 768,
+            height: 736,
+            length: 124,
+            steps: 8,
+            seed: 12345
+          }
+        })
       }
     );
 
@@ -52,16 +51,28 @@ export default async function handler(req, res) {
       response.status
     );
 
-    const text = await response.text();
+    const responseText = await response.text();
 
     console.log(
       "TEST 5: RunPod response:",
-      text
+      responseText
     );
 
-    return res.status(response.status).json({
+    let data;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      return res.status(502).json({
+        error: "RunPodからJSONではないレスポンスが返りました。",
+        runpod_status: response.status,
+        response: responseText
+      });
+    }
+
+    return res.status(200).json({
       runpod_status: response.status,
-      response: text
+      response: data
     });
 
   } catch (error) {
