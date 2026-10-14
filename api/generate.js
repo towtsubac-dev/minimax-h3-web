@@ -1,32 +1,43 @@
 export default async function handler(request) {
+  console.log("STEP 1: generate.js started");
+
   if (request.method !== "POST") {
     return new Response(
       JSON.stringify({ error: "Method not allowed" }),
       {
         status: 405,
-        headers: {
-          "Content-Type": "application/json"
-        }
+        headers: { "Content-Type": "application/json" }
       }
     );
   }
 
   try {
-    const { image, prompt } = await request.json();
+    console.log("STEP 2: reading request body");
+
+    const body = await request.json();
+
+    console.log("STEP 3: request body received");
+
+    const { image, prompt } = body;
 
     if (!image) {
       return new Response(
         JSON.stringify({ error: "画像がありません。" }),
         {
           status: 400,
-          headers: {
-            "Content-Type": "application/json"
-          }
+          headers: { "Content-Type": "application/json" }
         }
       );
     }
 
+    console.log("STEP 4: image exists");
+
     const apiKey = process.env.RUNPOD_API_KEY;
+
+    console.log(
+      "STEP 5: API key exists:",
+      !!apiKey
+    );
 
     if (!apiKey) {
       return new Response(
@@ -35,40 +46,61 @@ export default async function handler(request) {
         }),
         {
           status: 500,
-          headers: {
-            "Content-Type": "application/json"
-          }
+          headers: { "Content-Type": "application/json" }
         }
       );
     }
 
-    const runpodResponse = await fetch(
-      "https://api.runpod.ai/v2/18lt7ar99rsrfw/run",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          input: {
-            action: "h3_generate",
-            image,
-            prompt: prompt || "",
-            width: 768,
-            height: 736,
-            length: 124,
-            steps: 8,
-            seed: Math.floor(Math.random() * 1000000000)
-          }
-        })
-      }
+    console.log("STEP 6: before RunPod fetch");
+
+    const controller = new AbortController();
+
+    const timeout = setTimeout(() => {
+      console.log("STEP 7: RunPod fetch timeout");
+      controller.abort();
+    }, 30000);
+
+    let runpodResponse;
+
+    try {
+      runpodResponse = await fetch(
+        "https://api.runpod.ai/v2/18lt7ar99rsrfw/run",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            input: {
+              action: "h3_generate",
+              image,
+              prompt: prompt || "",
+              width: 768,
+              height: 736,
+              length: 124,
+              steps: 8,
+              seed: Math.floor(Math.random() * 1000000000)
+            }
+          }),
+          signal: controller.signal
+        }
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    console.log(
+      "STEP 8: RunPod response received:",
+      runpodResponse.status
     );
 
     const responseText = await runpodResponse.text();
 
-    console.log("RunPod run HTTP:", runpodResponse.status);
-    console.log("RunPod run response:", responseText);
+    console.log(
+      "STEP 9: RunPod response:",
+      responseText
+    );
 
     let data;
 
@@ -83,9 +115,7 @@ export default async function handler(request) {
         }),
         {
           status: 502,
-          headers: {
-            "Content-Type": "application/json"
-          }
+          headers: { "Content-Type": "application/json" }
         }
       );
     }
@@ -99,9 +129,7 @@ export default async function handler(request) {
         }),
         {
           status: 502,
-          headers: {
-            "Content-Type": "application/json"
-          }
+          headers: { "Content-Type": "application/json" }
         }
       );
     }
@@ -114,12 +142,15 @@ export default async function handler(request) {
         }),
         {
           status: 502,
-          headers: {
-            "Content-Type": "application/json"
-          }
+          headers: { "Content-Type": "application/json" }
         }
       );
     }
+
+    console.log(
+      "STEP 10: job created:",
+      data.id
+    );
 
     return new Response(
       JSON.stringify({
@@ -136,17 +167,17 @@ export default async function handler(request) {
     );
 
   } catch (error) {
-    console.error("generate error:", error);
+    console.error("GENERATE ERROR:", error);
 
     return new Response(
       JSON.stringify({
-        error: error.message || "サーバーエラー"
+        error: error.name === "AbortError"
+          ? "RunPodへの接続が30秒以内に完了しませんでした。"
+          : (error.message || "サーバーエラー")
       }),
       {
         status: 500,
-        headers: {
-          "Content-Type": "application/json"
-        }
+        headers: { "Content-Type": "application/json" }
       }
     );
   }
