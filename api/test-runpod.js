@@ -32,10 +32,18 @@ export default async function handler(req, res) {
           "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          input: {
-            action: "health"
-          }
-        })
+          body: JSON.stringify({
+            input: {
+              action: "h3_generate",
+              image: "test",
+              prompt: "test",
+              width: 768,
+              height: 736,
+              length: 124,
+              steps: 8,
+              seed: 12345
+            }
+          })
       }
     );
 
