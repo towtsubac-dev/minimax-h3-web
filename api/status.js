@@ -1,49 +1,39 @@
-export default async function handler(request) {
-  if (request.method !== "GET") {
-    return new Response(
-      JSON.stringify({ error: "Method not allowed" }),
-      {
-        status: 405,
-        headers: {
-          "Content-Type": "application/json"
-        }
-      }
-    );
+module.exports = async function handler(req, res) {
+  console.log("STATUS 1: started");
+
+  if (req.method !== "GET") {
+    return res.status(405).json({
+      error: "Method not allowed"
+    });
+  }
+
+  const jobId = req.query?.job_id;
+
+  console.log("STATUS 2: job_id:", jobId);
+
+  if (!jobId) {
+    return res.status(400).json({
+      error: "job_id is required"
+    });
+  }
+
+  const apiKey = process.env.RUNPOD_API_KEY;
+
+  console.log(
+    "STATUS 3: API key exists:",
+    !!apiKey
+  );
+
+  if (!apiKey) {
+    return res.status(500).json({
+      error: "RUNPOD_API_KEY is not configured."
+    });
   }
 
   try {
-    const url = new URL(request.url);
-    const jobId = url.searchParams.get("job_id");
+    console.log("STATUS 4: before RunPod fetch");
 
-    if (!jobId) {
-      return new Response(
-        JSON.stringify({ error: "job_idがありません。" }),
-        {
-          status: 400,
-          headers: {
-            "Content-Type": "application/json"
-          }
-        }
-      );
-    }
-
-    const apiKey = process.env.RUNPOD_API_KEY;
-
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({
-          error: "RUNPOD_API_KEY is not configured."
-        }),
-        {
-          status: 500,
-          headers: {
-            "Content-Type": "application/json"
-          }
-        }
-      );
-    }
-
-    const runpodResponse = await fetch(
+    const response = await fetch(
       `https://api.runpod.ai/v2/18lt7ar99rsrfw/status/${encodeURIComponent(jobId)}`,
       {
         method: "GET",
@@ -53,71 +43,45 @@ export default async function handler(request) {
       }
     );
 
-    const responseText = await runpodResponse.text();
+    console.log(
+      "STATUS 5: RunPod HTTP status:",
+      response.status
+    );
 
-    console.log("RunPod status HTTP:", runpodResponse.status);
-    console.log("RunPod status response:", responseText);
+    const responseText = await response.text();
+
+    console.log(
+      "STATUS 6: RunPod response:",
+      responseText
+    );
 
     let data;
 
     try {
       data = JSON.parse(responseText);
     } catch {
-      return new Response(
-        JSON.stringify({
-          error: "RunPodからJSONではないレスポンスが返りました。",
-          status: runpodResponse.status,
-          response: responseText
-        }),
-        {
-          status: 502,
-          headers: {
-            "Content-Type": "application/json"
-          }
-        }
-      );
+      return res.status(502).json({
+        error: "RunPodからJSONではないレスポンスが返りました。",
+        runpod_status: response.status,
+        response: responseText
+      });
     }
 
-    if (!runpodResponse.ok) {
-      return new Response(
-        JSON.stringify({
-          error: "RunPod API error",
-          status: runpodResponse.status,
-          details: data
-        }),
-        {
-          status: 502,
-          headers: {
-            "Content-Type": "application/json"
-          }
-        }
-      );
+    if (!response.ok) {
+      return res.status(502).json({
+        error: "RunPod status API error",
+        runpod_status: response.status,
+        details: data
+      });
     }
 
-    return new Response(
-      JSON.stringify(data),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-store"
-        }
-      }
-    );
+    return res.status(200).json(data);
 
   } catch (error) {
-    console.error("status error:", error);
+    console.error("STATUS ERROR:", error);
 
-    return new Response(
-      JSON.stringify({
-        error: error.message || "サーバーエラー"
-      }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json"
-        }
-      }
-    );
+    return res.status(500).json({
+      error: error.message || "Status check failed"
+    });
   }
-}
+};
