@@ -167,8 +167,9 @@ generateButton.addEventListener("click", async () => {
     // 画像をBase64に変換
     const imageBase64 = await fileToBase64(selectedImage);
 
-    status.textContent = "動画を生成しています…";
+    status.textContent = "RunPodに生成ジョブを送信しています…";
 
+    // 生成ジョブを開始
     const response = await fetch("/api/generate", {
       method: "POST",
       headers: {
@@ -183,32 +184,125 @@ generateButton.addEventListener("click", async () => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || "生成に失敗しました。");
+      throw new Error(data.error || "生成ジョブの開始に失敗しました。");
     }
 
-    if (!data.video_url) {
-      throw new Error("生成された動画が見つかりません。");
+    if (!data.job_id) {
+      throw new Error("RunPodのジョブIDが取得できませんでした。");
     }
 
-    status.textContent = "生成完了";
+    const jobId = data.job_id;
 
-    result.innerHTML = `
-      <video controls autoplay playsinline>
-        <source src="${data.video_url}" type="video/mp4">
-      </video>
-    `;
+    status.textContent =
+      "動画を生成しています…\n" +
+      "ジョブID: " + jobId;
+
+    // RunPodの状態を確認
+    await pollJob(jobId);
 
   } catch (error) {
 
     console.error(error);
     status.textContent = "エラー:\n" + error.message;
 
-  } finally {
-
     generateButton.disabled = false;
-
   }
 });
+
+async function pollJob(jobId) {
+
+  const maxAttempts = 180;
+  const interval = 5000;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+
+    await sleep(interval);
+
+    const response = await fetch(
+      "/api/status?job_id=" + encodeURIComponent(jobId),
+      {
+        method: "GET",
+        cache: "no-store"
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error || "RunPodの状態確認に失敗しました。"
+      );
+    }
+
+    console.log("RunPod status:", data);
+
+    if (data.status === "IN_QUEUE") {
+
+      status.textContent =
+        "生成待機中…\n" +
+        "ジョブID: " + jobId;
+
+      continue;
+    }
+
+    if (data.status === "IN_PROGRESS") {
+
+      status.textContent =
+        "動画を生成しています…\n" +
+        "ジョブID: " + jobId;
+
+      continue;
+    }
+
+    if (data.status === "COMPLETED") {
+
+      const outputs = data.output?.outputs || [];
+
+      const video = outputs.find(
+        output =>
+          output.type === "video" ||
+          output.filename?.toLowerCase().endsWith(".mp4")
+      );
+
+      if (!video?.data) {
+        throw new Error(
+          "生成は完了しましたが、動画データが見つかりません。"
+        );
+      }
+
+      status.textContent = "生成完了";
+
+      result.innerHTML = `
+        <video controls autoplay playsinline>
+          <source src="data:video/mp4;base64,${video.data}" type="video/mp4">
+        </video>
+      `;
+
+      generateButton.disabled = false;
+
+      return;
+    }
+
+    if (data.status === "FAILED") {
+      throw new Error(
+        "RunPodで動画生成に失敗しました。\n" +
+        JSON.stringify(data.error || data.output || data)
+      );
+    }
+
+    status.textContent =
+      "処理中… (" + data.status + ")\n" +
+      "ジョブID: " + jobId;
+  }
+
+  throw new Error(
+    "生成が長時間完了しませんでした。ジョブID: " + jobId
+  );
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
