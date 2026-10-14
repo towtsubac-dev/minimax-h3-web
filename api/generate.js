@@ -10,7 +10,12 @@ export default async function handler(req, res) {
   try {
     console.log("STEP 2: request body received");
 
-    const { image, prompt, width, height } = req.body || {};
+    const {
+      image,
+      prompt,
+      width,
+      height
+    } = req.body || {};
 
     if (!image) {
       return res.status(400).json({
@@ -33,21 +38,42 @@ export default async function handler(req, res) {
       });
     }
 
-    // RunPodへ送信するデータ
+    // H3 requires width/height to be multiples of 32.
+    // Keep the values within the currently tested 768 x 736 maximum.
+    const safeWidth = Math.max(
+      32,
+      Math.min(
+        768,
+        Math.round(Number(width || 768) / 32) * 32
+      )
+    );
+
+    const safeHeight = Math.max(
+      32,
+      Math.min(
+        736,
+        Math.round(Number(height || 736) / 32) * 32
+      )
+    );
+
+    console.log(
+      "H3 RESOLUTION:",
+      `${safeWidth}x${safeHeight}`
+    );
+
     const payload = {
       input: {
         action: "h3_generate",
         image,
         prompt: prompt || "",
-        width: 480,
-        height: 760,
+        width: safeWidth,
+        height: safeHeight,
         length: 124,
         steps: 8,
         seed: Math.floor(Math.random() * 1000000000)
       }
     };
 
-    // 送信データのサイズを計測
     const payloadBytes = Buffer.byteLength(
       JSON.stringify(payload),
       "utf8"
