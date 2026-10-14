@@ -1,11 +1,8 @@
-<!DOCTYPE html>
-<html lang="ja">
+<!DOCTYPE html><html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MiniMax H3 Video</title>
-
-  <style>
+  <title>MiniMax H3 Video</title>  <style>
     * {
       box-sizing: border-box;
     }
@@ -92,37 +89,22 @@
       width: 100%;
       border-radius: 12px;
     }
-  </style>
-</head>
+  </style></head><body><div class="container">  <h1>MiniMax H3 Video</h1>  <div class="card"><label for="image">画像</label>
+<input id="image" type="file" accept="image/*">
 
-<body>
+<div id="preview" class="preview"></div>
 
-<div class="container">
+<label for="prompt">プロンプト</label>
 
-  <h1>MiniMax H3 Video</h1>
+<textarea id="prompt">A realistic subject remains in the same position and composition. Subtle natural movement and blinking. Keep the appearance and body shape consistent throughout the video. Keep the camera completely stable with no zoom or reframing.</textarea>
 
-  <div class="card">
+<button id="generate">動画生成</button>
 
-    <label for="image">画像</label>
-    <input id="image" type="file" accept="image/*">
+<div id="status"></div>
 
-    <div id="preview" class="preview"></div>
+<div id="result"></div>
 
-    <label for="prompt">プロンプト</label>
-
-    <textarea id="prompt">A realistic subject remains in the same position and composition. Subtle natural movement and blinking. Keep the appearance and body shape consistent throughout the video. Keep the camera completely stable with no zoom or reframing.</textarea>
-
-    <button id="generate">動画生成</button>
-
-    <div id="status"></div>
-
-    <div id="result"></div>
-
-  </div>
-
-</div>
-
-<script>
+  </div></div><script>
 const imageInput = document.getElementById("image");
 const preview = document.getElementById("preview");
 const generateButton = document.getElementById("generate");
@@ -130,12 +112,16 @@ const status = document.getElementById("status");
 const result = document.getElementById("result");
 
 let selectedImage = null;
+let imageWidth = 0;
+let imageHeight = 0;
 
 imageInput.addEventListener("change", () => {
   const file = imageInput.files[0];
 
   if (!file) {
     selectedImage = null;
+    imageWidth = 0;
+    imageHeight = 0;
     preview.innerHTML = "";
     return;
   }
@@ -144,9 +130,21 @@ imageInput.addEventListener("change", () => {
 
   const url = URL.createObjectURL(file);
 
-  preview.innerHTML = `
-    <img src="${url}" alt="選択した画像">
-  `;
+  const img = new Image();
+
+  img.onload = () => {
+    imageWidth = img.naturalWidth;
+    imageHeight = img.naturalHeight;
+
+    preview.innerHTML = `
+      <img src="${url}" alt="選択した画像">
+      <div style="margin-top:8px;font-size:14px;color:#666;">
+        ${imageWidth} × ${imageHeight}
+      </div>
+    `;
+  };
+
+  img.src = url;
 });
 
 generateButton.addEventListener("click", async () => {
@@ -156,10 +154,56 @@ generateButton.addEventListener("click", async () => {
     return;
   }
 
+  if (!imageWidth || !imageHeight) {
+    status.textContent = "画像サイズを取得できませんでした。";
+    return;
+  }
+
   const prompt = document.getElementById("prompt").value;
 
+  // 元画像の縦横比を維持して生成サイズを決定
+  const maxWidth = 768;
+  const maxHeight = 736;
+  const multiple = 16;
+
+  const scale = Math.min(
+    maxWidth / imageWidth,
+    maxHeight / imageHeight
+  );
+
+  let width = Math.round(imageWidth * scale);
+  let height = Math.round(imageHeight * scale);
+
+  // H3で扱いやすいよう16の倍数にする
+  width = Math.max(
+    multiple,
+    Math.round(width / multiple) * multiple
+  );
+
+  height = Math.max(
+    multiple,
+    Math.round(height / multiple) * multiple
+  );
+
+  // 最大サイズを超えないよう再調整
+  if (width > maxWidth) {
+    width = maxWidth;
+    height = Math.round((width * imageHeight / imageWidth) / multiple) * multiple;
+  }
+
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = Math.round((height * imageWidth / imageHeight) / multiple) * multiple;
+  }
+
+  console.log("Original image:", imageWidth, "x", imageHeight);
+  console.log("Generation size:", width, "x", height);
+
   generateButton.disabled = true;
-  status.textContent = "画像を準備しています…";
+  status.textContent =
+    "画像を準備しています…\n" +
+    `生成サイズ: ${width} × ${height}`;
+
   result.innerHTML = "";
 
   try {
@@ -167,7 +211,9 @@ generateButton.addEventListener("click", async () => {
     // 画像をBase64に変換
     const imageBase64 = await fileToBase64(selectedImage);
 
-    status.textContent = "RunPodに生成ジョブを送信しています…";
+    status.textContent =
+      "RunPodに生成ジョブを送信しています…\n" +
+      `生成サイズ: ${width} × ${height}`;
 
     // 生成ジョブを開始
     const response = await fetch("/api/generate", {
@@ -177,7 +223,9 @@ generateButton.addEventListener("click", async () => {
       },
       body: JSON.stringify({
         image: imageBase64,
-        prompt: prompt
+        prompt: prompt,
+        width: width,
+        height: height
       })
     });
 
@@ -195,6 +243,7 @@ generateButton.addEventListener("click", async () => {
 
     status.textContent =
       "動画を生成しています…\n" +
+      `生成サイズ: ${width} × ${height}\n` +
       "ジョブID: " + jobId;
 
     // RunPodの状態を確認
@@ -324,7 +373,5 @@ function fileToBase64(file) {
     reader.readAsDataURL(file);
   });
 }
-</script>
-
-</body>
+</script></body>
 </html>
