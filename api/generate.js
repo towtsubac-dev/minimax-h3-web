@@ -1,62 +1,44 @@
-export default async function handler(request) {
+export default async function handler(req, res) {
   console.log("STEP 1: generate.js started");
 
-  if (request.method !== "POST") {
-    return new Response(
-      JSON.stringify({ error: "Method not allowed" }),
-      {
-        status: 405,
-        headers: { "Content-Type": "application/json" }
-      }
-    );
+  if (req.method !== "POST") {
+    return res.status(405).json({
+      error: "Method not allowed"
+    });
   }
 
   try {
-    console.log("STEP 2: reading request body");
+    console.log("STEP 2: request body received");
 
-    const body = await request.json();
-
-    console.log("STEP 3: request body received");
-
-    const { image, prompt } = body;
+    const { image, prompt } = req.body || {};
 
     if (!image) {
-      return new Response(
-        JSON.stringify({ error: "画像がありません。" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" }
-        }
-      );
+      return res.status(400).json({
+        error: "画像がありません。"
+      });
     }
 
-    console.log("STEP 4: image exists");
+    console.log("STEP 3: image exists");
 
     const apiKey = process.env.RUNPOD_API_KEY;
 
     console.log(
-      "STEP 5: API key exists:",
+      "STEP 4: API key exists:",
       !!apiKey
     );
 
     if (!apiKey) {
-      return new Response(
-        JSON.stringify({
-          error: "RUNPOD_API_KEY is not configured."
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" }
-        }
-      );
+      return res.status(500).json({
+        error: "RUNPOD_API_KEY is not configured."
+      });
     }
 
-    console.log("STEP 6: before RunPod fetch");
+    console.log("STEP 5: before RunPod fetch");
 
     const controller = new AbortController();
 
     const timeout = setTimeout(() => {
-      console.log("STEP 7: RunPod fetch timeout");
+      console.log("STEP 6: RunPod fetch timeout");
       controller.abort();
     }, 30000);
 
@@ -64,7 +46,7 @@ export default async function handler(request) {
 
     try {
       runpodResponse = await fetch(
-        "https://api.runpod.ai/v2/18lt7ar99rsrfw/run",
+        "https://api.runpod.ai/v2/18lt7ar99rsrf/run",
         {
           method: "POST",
           headers: {
@@ -91,14 +73,14 @@ export default async function handler(request) {
     }
 
     console.log(
-      "STEP 8: RunPod response received:",
+      "STEP 7: RunPod response received:",
       runpodResponse.status
     );
 
     const responseText = await runpodResponse.text();
 
     console.log(
-      "STEP 9: RunPod response:",
+      "STEP 8: RunPod response:",
       responseText
     );
 
@@ -107,78 +89,46 @@ export default async function handler(request) {
     try {
       data = JSON.parse(responseText);
     } catch {
-      return new Response(
-        JSON.stringify({
-          error: "RunPodからJSONではないレスポンスが返りました。",
-          status: runpodResponse.status,
-          response: responseText
-        }),
-        {
-          status: 502,
-          headers: { "Content-Type": "application/json" }
-        }
-      );
+      return res.status(502).json({
+        error: "RunPodからJSONではないレスポンスが返りました。",
+        status: runpodResponse.status,
+        response: responseText
+      });
     }
 
     if (!runpodResponse.ok) {
-      return new Response(
-        JSON.stringify({
-          error: "RunPod API error",
-          status: runpodResponse.status,
-          details: data
-        }),
-        {
-          status: 502,
-          headers: { "Content-Type": "application/json" }
-        }
-      );
+      return res.status(502).json({
+        error: "RunPod API error",
+        status: runpodResponse.status,
+        details: data
+      });
     }
 
     if (!data.id) {
-      return new Response(
-        JSON.stringify({
-          error: "RunPodからjob IDが返ってきませんでした。",
-          details: data
-        }),
-        {
-          status: 502,
-          headers: { "Content-Type": "application/json" }
-        }
-      );
+      return res.status(502).json({
+        error: "RunPodからjob IDが返ってきませんでした。",
+        details: data
+      });
     }
 
     console.log(
-      "STEP 10: job created:",
+      "STEP 9: job created:",
       data.id
     );
 
-    return new Response(
-      JSON.stringify({
-        job_id: data.id,
-        status: data.status || "IN_QUEUE"
-      }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-store"
-        }
-      }
-    );
+    return res.status(200).json({
+      job_id: data.id,
+      status: data.status || "IN_QUEUE"
+    });
 
   } catch (error) {
     console.error("GENERATE ERROR:", error);
 
-    return new Response(
-      JSON.stringify({
-        error: error.name === "AbortError"
+    return res.status(500).json({
+      error:
+        error.name === "AbortError"
           ? "RunPodへの接続が30秒以内に完了しませんでした。"
           : (error.message || "サーバーエラー")
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" }
-      }
-    );
+    });
   }
 }
