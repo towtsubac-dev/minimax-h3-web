@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   try {
     console.log("STEP 2: request body received");
 
-    const { image, prompt } = req.body || {};
+    const { image, prompt, width, height } = req.body || {};
 
     if (!image) {
       return res.status(400).json({
@@ -39,8 +39,8 @@ export default async function handler(req, res) {
         action: "h3_generate",
         image,
         prompt: prompt || "",
-        width: 768,
-        height: 736,
+        width: width || 576,
+        height: height || 768,
         length: 124,
         steps: 8,
         seed: Math.floor(Math.random() * 1000000000)
