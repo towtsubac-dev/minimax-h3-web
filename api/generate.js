@@ -12,8 +12,7 @@ export default async function handler(req) {
   }
 
   try {
-    const body = await req.json();
-
+    const body = req.body;
     const { image, prompt } = body;
 
     if (!image) {
