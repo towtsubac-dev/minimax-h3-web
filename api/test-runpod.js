@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   console.log("TEST 1: started");
 
   if (req.method !== "GET") {
@@ -9,10 +9,7 @@ export default async function handler(req, res) {
 
   const apiKey = process.env.RUNPOD_API_KEY;
 
-  console.log(
-    "TEST 2: API key exists:",
-    !!apiKey
-  );
+  console.log("TEST 2: API key exists:", !!apiKey);
 
   if (!apiKey) {
     return res.status(500).json({
@@ -46,17 +43,11 @@ export default async function handler(req, res) {
       }
     );
 
-    console.log(
-      "TEST 4: RunPod HTTP status:",
-      response.status
-    );
+    console.log("TEST 4: RunPod HTTP status:", response.status);
 
     const responseText = await response.text();
 
-    console.log(
-      "TEST 5: RunPod response:",
-      responseText
-    );
+    console.log("TEST 5: RunPod response:", responseText);
 
     let data;
 
@@ -82,4 +73,4 @@ export default async function handler(req, res) {
       error: error.message || "RunPod connection failed"
     });
   }
-}
+};
