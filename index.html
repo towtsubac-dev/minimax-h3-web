@@ -4,42 +4,39 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>MiniMax H3 I2V</title>
+  <title>MiniMax H3 Image to Video</title>
 
   <style>
     body {
       font-family: sans-serif;
       max-width: 800px;
-      margin: 40px auto;
+      margin: 0 auto;
       padding: 20px;
     }
 
     h1 {
-      margin-bottom: 30px;
+      font-size: 24px;
     }
 
     .section {
-      margin-bottom: 25px;
+      margin-bottom: 20px;
     }
 
     label {
       display: block;
-      font-weight: bold;
       margin-bottom: 8px;
+      font-weight: bold;
     }
 
-    input[type="file"] {
+    input[type="file"],
+    textarea {
       width: 100%;
-      margin-bottom: 15px;
+      box-sizing: border-box;
     }
 
     textarea {
-      width: 100%;
-      min-height: 120px;
+      min-height: 100px;
       padding: 10px;
-      box-sizing: border-box;
-      font-size: 16px;
-      resize: vertical;
     }
 
     button {
@@ -50,7 +47,7 @@
 
     button:disabled {
       cursor: not-allowed;
-      opacity: 0.5;
+      opacity: 0.6;
     }
 
     #preview {
@@ -60,28 +57,40 @@
       margin-top: 10px;
     }
 
-    #status {
-      margin-top: 20px;
-      white-space: pre-wrap;
-    }
-
-    #result {
+    #video {
+      width: 100%;
+      max-height: 700px;
       display: none;
-      width: 100%;
       margin-top: 20px;
     }
 
-    video {
-      width: 100%;
-      max-width: 100%;
-      display: block;
+    #status {
+      margin-top: 15px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .info {
+      margin-top: 10px;
+      padding: 10px;
+      background: #f5f5f5;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .error {
+      color: #c00;
+    }
+
+    .success {
+      color: #080;
     }
   </style>
 </head>
 
 <body>
 
-  <h1>MiniMax H3 I2V</h1>
+  <h1>MiniMax H3 Image to Video</h1>
 
   <div class="section">
     <label for="imageInput">画像</label>
@@ -96,6 +105,12 @@
       id="preview"
       alt="Preview"
     >
+
+    <div
+      id="resolutionInfo"
+      class="info"
+      style="display:none;"
+    ></div>
   </div>
 
   <div class="section">
@@ -103,12 +118,15 @@
 
     <textarea
       id="prompt"
-      placeholder="動画生成のプロンプトを入力してください"
+      placeholder="動画にしたい動きを入力してください"
     ></textarea>
   </div>
 
   <div class="section">
-    <button id="generateButton">
+    <button
+      id="generateButton"
+      disabled
+    >
       動画生成
     </button>
   </div>
@@ -116,120 +134,184 @@
   <div id="status"></div>
 
   <video
-    id="result"
+    id="video"
     controls
-    playsinline
   ></video>
 
+
   <script>
-    const imageInput = document.getElementById("imageInput");
-    const preview = document.getElementById("preview");
-    const promptInput = document.getElementById("prompt");
-    const generateButton = document.getElementById("generateButton");
-    const statusElement = document.getElementById("status");
-    const resultVideo = document.getElementById("result");
+
+    // ---------------------------------------------------------
+    // Elements
+    // ---------------------------------------------------------
+
+    const imageInput =
+      document.getElementById("imageInput");
+
+    const preview =
+      document.getElementById("preview");
+
+    const promptInput =
+      document.getElementById("prompt");
+
+    const generateButton =
+      document.getElementById("generateButton");
+
+    const statusElement =
+      document.getElementById("status");
+
+    const videoElement =
+      document.getElementById("video");
+
+    const resolutionInfo =
+      document.getElementById("resolutionInfo");
+
+
+    // ---------------------------------------------------------
+    // Image state
+    // ---------------------------------------------------------
 
     let imageBase64 = "";
+
     let naturalWidth = 0;
     let naturalHeight = 0;
 
-    // ---------------------------------------------------------
-    // Image selection
-    // ---------------------------------------------------------
-
-    imageInput.addEventListener("change", () => {
-      const file = imageInput.files[0];
-
-      if (!file) {
-        imageBase64 = "";
-        naturalWidth = 0;
-        naturalHeight = 0;
-
-        preview.style.display = "none";
-        return;
-      }
-
-      const reader = new FileReader();
-
-      reader.onload = () => {
-        imageBase64 = reader.result;
-
-        preview.src = imageBase64;
-        preview.style.display = "block";
-
-        const image = new Image();
-
-        image.onload = () => {
-          naturalWidth = image.naturalWidth;
-          naturalHeight = image.naturalHeight;
-
-          console.log(
-            "Original image:",
-            naturalWidth,
-            "x",
-            naturalHeight
-          );
-        };
-
-        image.src = imageBase64;
-      };
-
-      reader.readAsDataURL(file);
-    });
 
     // ---------------------------------------------------------
-    // Calculate H3 resolution
+    // Status helper
+    // ---------------------------------------------------------
+
+    function setStatus(message, type = "") {
+
+      statusElement.textContent = message;
+
+      statusElement.className = type;
+    }
+
+
+    // ---------------------------------------------------------
+    // H3 resolution calculation
+    //
+    // Official MiniMax H3 canvas logic:
+    // - short edge = 768
+    // - maximum area = 768 x 1344
+    // - each axis rounded to a multiple of 32
+    //
+    // Example:
+    // 2928 x 3660 (4:5)
+    // -> 768 x 960
     // ---------------------------------------------------------
 
     function calculateH3Resolution() {
-      const MAX_WIDTH = 768;
-      const MAX_HEIGHT = 736;
+
+      const BASE_SHORT_EDGE = 768;
+
+      const MAX_PIXELS =
+        768 * 1344;
+
       const STEP = 32;
+
 
       if (
         !naturalWidth ||
         !naturalHeight
       ) {
+
         return {
           width: 768,
-          height: 736
+          height: 768
         };
       }
+
 
       const aspectRatio =
         naturalWidth / naturalHeight;
 
-      let targetWidth;
-      let targetHeight;
 
-      // Start by fitting the image to the maximum height.
-      targetHeight = MAX_HEIGHT;
-      targetWidth = targetHeight * aspectRatio;
+      let width;
+      let height;
 
-      // If width exceeds the maximum,
-      // fit to the maximum width instead.
-      if (targetWidth > MAX_WIDTH) {
-        targetWidth = MAX_WIDTH;
-        targetHeight = targetWidth / aspectRatio;
+
+      // -------------------------------------------------------
+      // Preserve original aspect ratio
+      // -------------------------------------------------------
+
+      if (aspectRatio >= 1.0) {
+
+        // Landscape
+
+        height = BASE_SHORT_EDGE;
+
+        width =
+          height * aspectRatio;
+
+      } else {
+
+        // Portrait
+
+        width = BASE_SHORT_EDGE;
+
+        height =
+          width / aspectRatio;
       }
 
-      // H3 requires dimensions in 32-pixel increments.
-      let width =
-        Math.round(targetWidth / STEP) * STEP;
 
-      let height =
-        Math.round(targetHeight / STEP) * STEP;
+      // -------------------------------------------------------
+      // Maximum H3 canvas area
+      // -------------------------------------------------------
 
-      // Safety limits.
-      width = Math.max(
-        STEP,
-        Math.min(MAX_WIDTH, width)
-      );
+      if (
+        width * height >
+        MAX_PIXELS
+      ) {
 
-      height = Math.max(
-        STEP,
-        Math.min(MAX_HEIGHT, height)
-      );
+        const scale =
+          Math.sqrt(
+            MAX_PIXELS /
+            (width * height)
+          );
+
+        width *= scale;
+        height *= scale;
+      }
+
+
+      // -------------------------------------------------------
+      // Round each axis to 32 pixels
+      // -------------------------------------------------------
+
+      width =
+        Math.max(
+          STEP,
+          Math.round(width / STEP) * STEP
+        );
+
+      height =
+        Math.max(
+          STEP,
+          Math.round(height / STEP) * STEP
+        );
+
+
+      // -------------------------------------------------------
+      // Safety check
+      // -------------------------------------------------------
+
+      while (
+        width * height >
+        MAX_PIXELS
+      ) {
+
+        if (width >= height) {
+
+          width -= STEP;
+
+        } else {
+
+          height -= STEP;
+        }
+      }
+
 
       console.log(
         "Original image:",
@@ -250,258 +332,469 @@
         height
       );
 
+      console.log(
+        "H3 aspect ratio:",
+        width / height
+      );
+
+
       return {
         width,
         height
       };
     }
 
+
     // ---------------------------------------------------------
-    // Generate
+    // Display resolution information
     // ---------------------------------------------------------
 
-    generateButton.addEventListener("click", async () => {
-
-      if (!imageBase64) {
-        alert("画像を選択してください。");
-        return;
-      }
+    function updateResolutionInfo() {
 
       if (
         !naturalWidth ||
         !naturalHeight
       ) {
-        alert("画像サイズを取得できませんでした。");
+
+        resolutionInfo.style.display =
+          "none";
+
         return;
       }
 
-      generateButton.disabled = true;
 
-      resultVideo.style.display = "none";
-      resultVideo.removeAttribute("src");
-      resultVideo.load();
+      const resolution =
+        calculateH3Resolution();
 
-      statusElement.textContent =
-        "生成リクエストを送信しています…";
 
-      try {
+      const originalRatio =
+        naturalWidth /
+        naturalHeight;
 
-        // Calculate resolution from original image aspect ratio.
+
+      const outputRatio =
+        resolution.width /
+        resolution.height;
+
+
+      resolutionInfo.textContent =
+        `元画像: ${naturalWidth} × ${naturalHeight}` +
+        `\n元画像比率: ${originalRatio.toFixed(4)}` +
+        `\nH3生成解像度: ${resolution.width} × ${resolution.height}` +
+        `\n生成比率: ${outputRatio.toFixed(4)}`;
+
+
+      resolutionInfo.style.display =
+        "block";
+    }
+
+
+    // ---------------------------------------------------------
+    // Read selected image
+    // ---------------------------------------------------------
+
+    imageInput.addEventListener(
+      "change",
+      () => {
+
+        const file =
+          imageInput.files?.[0];
+
+
+        if (!file) {
+
+          imageBase64 = "";
+
+          naturalWidth = 0;
+          naturalHeight = 0;
+
+          preview.style.display =
+            "none";
+
+          resolutionInfo.style.display =
+            "none";
+
+          generateButton.disabled =
+            true;
+
+          return;
+        }
+
+
+        const reader =
+          new FileReader();
+
+
+        reader.onload = () => {
+
+          imageBase64 =
+            reader.result;
+
+
+          const image =
+            new Image();
+
+
+          image.onload = () => {
+
+            naturalWidth =
+              image.naturalWidth;
+
+            naturalHeight =
+              image.naturalHeight;
+
+
+            preview.src =
+              imageBase64;
+
+            preview.style.display =
+              "block";
+
+
+            updateResolutionInfo();
+
+
+            generateButton.disabled =
+              false;
+          };
+
+
+          image.onerror = () => {
+
+            setStatus(
+              "画像の読み込みに失敗しました。",
+              "error"
+            );
+
+            generateButton.disabled =
+              true;
+          };
+
+
+          image.src =
+            imageBase64;
+        };
+
+
+        reader.onerror = () => {
+
+          setStatus(
+            "画像ファイルの読み込みに失敗しました。",
+            "error"
+          );
+
+          generateButton.disabled =
+            true;
+        };
+
+
+        reader.readAsDataURL(file);
+      }
+    );
+
+
+    // ---------------------------------------------------------
+    // Generate
+    // ---------------------------------------------------------
+
+    generateButton.addEventListener(
+      "click",
+      async () => {
+
+        if (!imageBase64) {
+
+          setStatus(
+            "画像を選択してください。",
+            "error"
+          );
+
+          return;
+        }
+
+
         const resolution =
           calculateH3Resolution();
 
-        console.log(
-          "Sending resolution:",
-          resolution.width,
-          "x",
-          resolution.height
+
+        generateButton.disabled =
+          true;
+
+
+        videoElement.style.display =
+          "none";
+
+        videoElement.removeAttribute(
+          "src"
         );
 
-        // -----------------------------------------------------
-        // Send generation request
-        // -----------------------------------------------------
 
-        const response = await fetch(
-          "/api/generate",
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type": "application/json"
-            },
-
-            body: JSON.stringify({
-              image: imageBase64,
-              prompt: promptInput.value,
-
-              width: resolution.width,
-              height: resolution.height
-            })
-          }
+        setStatus(
+          `動画生成を開始しています。\n` +
+          `生成解像度: ${resolution.width} × ${resolution.height}`
         );
 
-        const data = await response.json();
 
-        if (!response.ok) {
-          throw new Error(
-            data.error ||
-            "生成リクエストに失敗しました。"
-          );
-        }
+        try {
 
-        if (!data.job_id) {
-          throw new Error(
-            "RunPodのjob IDを取得できませんでした。"
-          );
-        }
+          // ---------------------------------------------------
+          // Submit RunPod job
+          // ---------------------------------------------------
 
-        const jobId = data.job_id;
-
-        console.log(
-          "RunPod job ID:",
-          jobId
-        );
-
-        statusElement.textContent =
-          "生成を開始しました。\n" +
-          "Job ID: " +
-          jobId +
-          "\n\n" +
-          "生成中…";
-
-        // -----------------------------------------------------
-        // Poll status
-        // -----------------------------------------------------
-
-        const maxAttempts = 180;
-        let attempts = 0;
-
-        while (attempts < maxAttempts) {
-
-          attempts++;
-
-          await new Promise(
-            resolve => setTimeout(resolve, 5000)
-          );
-
-          const statusResponse =
+          const response =
             await fetch(
-              "/api/status?job_id=" +
-              encodeURIComponent(jobId)
+              "/api/generate",
+              {
+                method: "POST",
+
+                headers: {
+                  "Content-Type":
+                    "application/json"
+                },
+
+                body: JSON.stringify({
+
+                  image:
+                    imageBase64,
+
+                  prompt:
+                    promptInput.value || "",
+
+                  width:
+                    resolution.width,
+
+                  height:
+                    resolution.height
+                })
+              }
             );
 
-          const statusData =
-            await statusResponse.json();
 
-          console.log(
-            "Status:",
-            statusData
-          );
+          const data =
+            await response.json();
 
-          if (!statusResponse.ok) {
+
+          if (!response.ok) {
+
             throw new Error(
-              statusData.error ||
-              "ステータス取得に失敗しました。"
+              data.error ||
+              "動画生成ジョブの登録に失敗しました。"
             );
           }
 
+
+          if (!data.job_id) {
+
+            throw new Error(
+              "RunPodのjob IDを取得できませんでした。"
+            );
+          }
+
+
+          const jobId =
+            data.job_id;
+
+
+          setStatus(
+            `動画生成中です。\n` +
+            `解像度: ${resolution.width} × ${resolution.height}\n` +
+            `Job ID: ${jobId}`
+          );
+
+
           // ---------------------------------------------------
-          // COMPLETED
+          // Poll status
           // ---------------------------------------------------
 
-          if (
-            statusData.status ===
-            "COMPLETED"
+          const MAX_ATTEMPTS = 180;
+
+          let completed = false;
+
+
+          for (
+            let attempt = 0;
+            attempt < MAX_ATTEMPTS;
+            attempt++
           ) {
 
-            statusElement.textContent =
-              "生成完了。";
+            await new Promise(
+              resolve =>
+                setTimeout(
+                  resolve,
+                  5000
+                )
+            );
 
-            const outputs =
-              statusData.output &&
-              statusData.output.outputs;
+
+            const statusResponse =
+              await fetch(
+                `/api/status?job_id=${encodeURIComponent(jobId)}`
+              );
+
+
+            const statusData =
+              await statusResponse.json();
+
+
+            if (!statusResponse.ok) {
+
+              throw new Error(
+                statusData.error ||
+                "ステータス取得に失敗しました。"
+              );
+            }
+
+
+            console.log(
+              "RunPod status:",
+              statusData
+            );
+
+
+            // -------------------------------------------------
+            // Completed
+            // -------------------------------------------------
 
             if (
-              !outputs ||
-              !outputs.length
+              statusData.status ===
+              "COMPLETED"
             ) {
+
+              completed = true;
+
+
+              const outputs =
+                statusData.output?.outputs;
+
+
+              if (
+                !outputs ||
+                !outputs.length
+              ) {
+
+                throw new Error(
+                  "生成完了しましたが、動画データが見つかりません。"
+                );
+              }
+
+
+              const output =
+                outputs[0];
+
+
+              let videoBase64 =
+                output.video ||
+                output.data ||
+                output;
+
+
+              if (
+                typeof videoBase64 !==
+                "string"
+              ) {
+
+                throw new Error(
+                  "動画データの形式を認識できません。"
+                );
+              }
+
+
+              // ---------------------------------------------
+              // Remove data URL prefix if present
+              // ---------------------------------------------
+
+              if (
+                videoBase64.startsWith(
+                  "data:"
+                )
+              ) {
+
+                videoElement.src =
+                  videoBase64;
+
+              } else {
+
+                videoElement.src =
+                  `data:video/mp4;base64,${videoBase64}`;
+              }
+
+
+              videoElement.style.display =
+                "block";
+
+
+              setStatus(
+                `動画生成が完了しました。\n` +
+                `解像度: ${resolution.width} × ${resolution.height}`,
+                "success"
+              );
+
+
+              break;
+            }
+
+
+            // -------------------------------------------------
+            // Failed
+            // -------------------------------------------------
+
+            if (
+              statusData.status ===
+                "FAILED" ||
+              statusData.status ===
+                "CANCELLED"
+            ) {
+
               throw new Error(
-                "生成結果の動画が見つかりません。"
+                statusData.error ||
+                statusData.output?.error ||
+                `RunPodジョブが${statusData.status}になりました。`
               );
             }
 
-            const videoOutput =
-              outputs.find(
-                item =>
-                  item.type === "video" ||
-                  item.data ||
-                  item.base64
-              );
 
-            if (!videoOutput) {
-              throw new Error(
-                "動画出力を取得できませんでした。"
-              );
-            }
+            // -------------------------------------------------
+            // Still running
+            // -------------------------------------------------
 
-            const videoBase64 =
-              videoOutput.data ||
-              videoOutput.base64;
-
-            if (!videoBase64) {
-              throw new Error(
-                "動画のBase64データがありません。"
-              );
-            }
-
-            resultVideo.src =
-              "data:video/mp4;base64," +
-              videoBase64;
-
-            resultVideo.style.display =
-              "block";
-
-            resultVideo.load();
-
-            break;
-          }
-
-          // ---------------------------------------------------
-          // FAILED
-          // ---------------------------------------------------
-
-          if (
-            statusData.status ===
-            "FAILED"
-          ) {
-
-            const errorMessage =
-              statusData.error ||
-              statusData.output?.error ||
-              "RunPodで動画生成に失敗しました。";
-
-            throw new Error(
-              errorMessage
+            setStatus(
+              `動画生成中です。\n` +
+              `解像度: ${resolution.width} × ${resolution.height}\n` +
+              `状態: ${statusData.status}\n` +
+              `経過確認: ${attempt + 1} / ${MAX_ATTEMPTS}`
             );
           }
 
-          // ---------------------------------------------------
-          // IN_QUEUE / IN_PROGRESS
-          // ---------------------------------------------------
 
-          statusElement.textContent =
-            "生成中…\n" +
-            "状態: " +
-            (statusData.status || "UNKNOWN") +
-            "\n" +
-            "経過: 約" +
-            (attempts * 5) +
-            "秒";
-        }
+          if (!completed) {
 
-        if (attempts >= maxAttempts) {
-          throw new Error(
-            "生成が15分以内に完了しませんでした。"
+            throw new Error(
+              "動画生成が15分以内に完了しませんでした。"
+            );
+          }
+
+
+        } catch (error) {
+
+          console.error(
+            "Generation error:",
+            error
           );
+
+
+          setStatus(
+            `エラー:\n${error.message}`,
+            "error"
+          );
+
+
+        } finally {
+
+          generateButton.disabled =
+            false;
         }
-
-      } catch (error) {
-
-        console.error(
-          "Generation error:",
-          error
-        );
-
-        statusElement.textContent =
-          "エラー:\n" +
-          (error.message ||
-            "不明なエラーが発生しました。");
-
-      } finally {
-
-        generateButton.disabled = false;
       }
-    });
+    );
+
   </script>
 
 </body>
