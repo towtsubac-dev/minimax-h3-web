@@ -1,125 +1,153 @@
-
-export default {
-  async fetch(request) {
-    if (request.method !== "POST") {
-      return Response.json(
-        { error: "Method not allowed" },
-        { status: 405 }
-      );
-    }
-
-    try {
-      const { image, prompt } = await request.json();
-
-      if (!image) {
-        return Response.json(
-          { error: "画像がありません。" },
-          { status: 400 }
-        );
+export default async function handler(request) {
+  if (request.method !== "POST") {
+    return new Response(
+      JSON.stringify({ error: "Method not allowed" }),
+      {
+        status: 405,
+        headers: {
+          "Content-Type": "application/json"
+        }
       }
+    );
+  }
 
-      const apiKey = process.env.RUNPOD_API_KEY;
+  try {
+    const { image, prompt } = await request.json();
 
-      if (!apiKey) {
-        return Response.json(
-          { error: "RUNPOD_API_KEY is not configured." },
-          { status: 500 }
-        );
-      }
-
-      const runpodResponse = await fetch(
-        "https://api.runpod.ai/v2/18lt7ar99rsrfw/runsync",
+    if (!image) {
+      return new Response(
+        JSON.stringify({ error: "画像がありません。" }),
         {
-          method: "POST",
+          status: 400,
           headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            input: {
-              action: "h3_generate",
-              image,
-              prompt: prompt || "",
-              width: 768,
-              height: 736,
-              length: 124,
-              steps: 8,
-              seed: Math.floor(Math.random() * 1000000000)
-            }
-          })
+            "Content-Type": "application/json"
+          }
         }
       );
+    }
 
-const responseText = await runpodResponse.text();
+    const apiKey = process.env.RUNPOD_API_KEY;
 
-console.log("RunPod HTTP status:", runpodResponse.status);
-console.log("RunPod response:", responseText);
-
-let data;
-
-try {
-  data = JSON.parse(responseText);
-} catch {
-  return Response.json(
-    {
-      error: "RunPodからJSONではないレスポンスが返りました。",
-      status: runpodResponse.status,
-      response: responseText
-    },
-    { status: 502 }
-  );
-}
-
-if (!runpodResponse.ok) {
-  return Response.json(
-    {
-      error: "RunPod API error",
-      status: runpodResponse.status,
-      details: data
-    },
-    { status: 502 }
-  );
-}
-
-      if (data.status !== "COMPLETED") {
-        return Response.json(
-          {
-            error: "RunPod job failed",
-            details: data
-          },
-          { status: 500 }
-        );
-      }
-
-      const outputs = data.output?.outputs || [];
-
-      const video = outputs.find(
-        output =>
-          output.type === "video" ||
-          output.filename?.toLowerCase().endsWith(".mp4")
-      );
-
-      if (!video?.data) {
-        return Response.json(
-          {
-            error: "生成された動画が見つかりません。",
-            details: data.output
-          },
-          { status: 500 }
-        );
-      }
-
-      return Response.json({
-        video_url: `data:video/mp4;base64,${video.data}`
-      });
-
-    } catch (error) {
-      console.error("generate error:", error);
-
-      return Response.json(
-        { error: error.message || "サーバーエラー" },
-        { status: 500 }
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({
+          error: "RUNPOD_API_KEY is not configured."
+        }),
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
       );
     }
+
+    const runpodResponse = await fetch(
+      "https://api.runpod.ai/v2/18lt7ar99rsrfw/run",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          input: {
+            action: "h3_generate",
+            image,
+            prompt: prompt || "",
+            width: 768,
+            height: 736,
+            length: 124,
+            steps: 8,
+            seed: Math.floor(Math.random() * 1000000000)
+          }
+        })
+      }
+    );
+
+    const responseText = await runpodResponse.text();
+
+    console.log("RunPod run HTTP:", runpodResponse.status);
+    console.log("RunPod run response:", responseText);
+
+    let data;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      return new Response(
+        JSON.stringify({
+          error: "RunPodからJSONではないレスポンスが返りました。",
+          status: runpodResponse.status,
+          response: responseText
+        }),
+        {
+          status: 502,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      );
+    }
+
+    if (!runpodResponse.ok) {
+      return new Response(
+        JSON.stringify({
+          error: "RunPod API error",
+          status: runpodResponse.status,
+          details: data
+        }),
+        {
+          status: 502,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      );
+    }
+
+    if (!data.id) {
+      return new Response(
+        JSON.stringify({
+          error: "RunPodからjob IDが返ってきませんでした。",
+          details: data
+        }),
+        {
+          status: 502,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        job_id: data.id,
+        status: data.status || "IN_QUEUE"
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store"
+        }
+      }
+    );
+
+  } catch (error) {
+    console.error("generate error:", error);
+
+    return new Response(
+      JSON.stringify({
+        error: error.message || "サーバーエラー"
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json"
+        }
+      }
+    );
   }
-};
+}
