@@ -33,6 +33,41 @@ export default async function handler(req, res) {
       });
     }
 
+    // RunPodへ送信するデータ
+    const payload = {
+      input: {
+        action: "h3_generate",
+        image,
+        prompt: prompt || "",
+        width: 768,
+        height: 736,
+        length: 124,
+        steps: 8,
+        seed: Math.floor(Math.random() * 1000000000)
+      }
+    };
+
+    // 送信データのサイズを計測
+    const payloadBytes = Buffer.byteLength(
+      JSON.stringify(payload),
+      "utf8"
+    );
+
+    console.log(
+      "IMAGE BASE64 LENGTH:",
+      image.length
+    );
+
+    console.log(
+      "RUNPOD PAYLOAD BYTES:",
+      payloadBytes
+    );
+
+    console.log(
+      "RUNPOD PAYLOAD MB:",
+      (payloadBytes / (1024 * 1024)).toFixed(2)
+    );
+
     console.log("STEP 5: before RunPod fetch");
 
     const controller = new AbortController();
@@ -46,25 +81,14 @@ export default async function handler(req, res) {
 
     try {
       runpodResponse = await fetch(
-        "https://api.runpod.ai/v2/18lt7ar99rsrf/run",
+        "https://api.runpod.ai/v2/18lt7ar99rsrfw/run",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${apiKey}`
           },
-          body: JSON.stringify({
-            input: {
-              action: "h3_generate",
-              image,
-              prompt: prompt || "",
-              width: 768,
-              height: 736,
-              length: 124,
-              steps: 8,
-              seed: Math.floor(Math.random() * 1000000000)
-            }
-          }),
+          body: JSON.stringify(payload),
           signal: controller.signal
         }
       );
