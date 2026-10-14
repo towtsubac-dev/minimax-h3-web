@@ -1,377 +1,508 @@
-<!DOCTYPE html><html lang="ja">
+<!DOCTYPE html>
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MiniMax H3 Video</title>  <style>
-    * {
-      box-sizing: border-box;
-    }
 
+  <title>MiniMax H3 I2V</title>
+
+  <style>
     body {
-      margin: 0;
+      font-family: sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
       padding: 20px;
-      font-family: system-ui, sans-serif;
-      background: #f5f5f5;
-      color: #222;
-    }
-
-    .container {
-      max-width: 700px;
-      margin: 0 auto;
     }
 
     h1 {
-      margin-bottom: 20px;
-      font-size: 24px;
+      margin-bottom: 30px;
     }
 
-    .card {
-      background: white;
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 2px 10px rgba(0,0,0,.08);
+    .section {
+      margin-bottom: 25px;
     }
 
     label {
       display: block;
-      margin: 16px 0 8px;
-      font-weight: 600;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      margin-bottom: 15px;
     }
 
     textarea {
       width: 100%;
       min-height: 120px;
-      padding: 12px;
-      border: 1px solid #ccc;
-      border-radius: 10px;
+      padding: 10px;
+      box-sizing: border-box;
+      font-size: 16px;
       resize: vertical;
-      font: inherit;
-    }
-
-    .preview {
-      margin-top: 15px;
-      text-align: center;
-    }
-
-    .preview img {
-      max-width: 100%;
-      max-height: 400px;
-      border-radius: 12px;
     }
 
     button {
-      width: 100%;
-      margin-top: 20px;
-      padding: 14px;
-      border: 0;
-      border-radius: 10px;
-      background: #222;
-      color: white;
+      padding: 12px 24px;
       font-size: 16px;
-      font-weight: 600;
+      cursor: pointer;
     }
 
     button:disabled {
-      opacity: .5;
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    #preview {
+      max-width: 100%;
+      max-height: 500px;
+      display: none;
+      margin-top: 10px;
     }
 
     #status {
-      margin-top: 15px;
-      text-align: center;
+      margin-top: 20px;
       white-space: pre-wrap;
     }
 
     #result {
+      display: none;
+      width: 100%;
       margin-top: 20px;
     }
 
     video {
       width: 100%;
-      border-radius: 12px;
+      max-width: 100%;
+      display: block;
     }
-  </style></head><body><div class="container">  <h1>MiniMax H3 Video</h1>  <div class="card"><label for="image">画像</label>
-<input id="image" type="file" accept="image/*">
+  </style>
+</head>
 
-<div id="preview" class="preview"></div>
+<body>
 
-<label for="prompt">プロンプト</label>
+  <h1>MiniMax H3 I2V</h1>
 
-<textarea id="prompt">A realistic subject remains in the same position and composition. Subtle natural movement and blinking. Keep the appearance and body shape consistent throughout the video. Keep the camera completely stable with no zoom or reframing.</textarea>
+  <div class="section">
+    <label for="imageInput">画像</label>
 
-<button id="generate">動画生成</button>
+    <input
+      type="file"
+      id="imageInput"
+      accept="image/*"
+    >
 
-<div id="status"></div>
+    <img
+      id="preview"
+      alt="Preview"
+    >
+  </div>
 
-<div id="result"></div>
+  <div class="section">
+    <label for="prompt">プロンプト</label>
 
-  </div></div><script>
-const imageInput = document.getElementById("image");
-const preview = document.getElementById("preview");
-const generateButton = document.getElementById("generate");
-const status = document.getElementById("status");
-const result = document.getElementById("result");
+    <textarea
+      id="prompt"
+      placeholder="動画生成のプロンプトを入力してください"
+    ></textarea>
+  </div>
 
-let selectedImage = null;
-let imageWidth = 0;
-let imageHeight = 0;
+  <div class="section">
+    <button id="generateButton">
+      動画生成
+    </button>
+  </div>
 
-imageInput.addEventListener("change", () => {
-  const file = imageInput.files[0];
+  <div id="status"></div>
 
-  if (!file) {
-    selectedImage = null;
-    imageWidth = 0;
-    imageHeight = 0;
-    preview.innerHTML = "";
-    return;
-  }
+  <video
+    id="result"
+    controls
+    playsinline
+  ></video>
 
-  selectedImage = file;
+  <script>
+    const imageInput = document.getElementById("imageInput");
+    const preview = document.getElementById("preview");
+    const promptInput = document.getElementById("prompt");
+    const generateButton = document.getElementById("generateButton");
+    const statusElement = document.getElementById("status");
+    const resultVideo = document.getElementById("result");
 
-  const url = URL.createObjectURL(file);
+    let imageBase64 = "";
+    let naturalWidth = 0;
+    let naturalHeight = 0;
 
-  const img = new Image();
+    // ---------------------------------------------------------
+    // Image selection
+    // ---------------------------------------------------------
 
-  img.onload = () => {
-    imageWidth = img.naturalWidth;
-    imageHeight = img.naturalHeight;
+    imageInput.addEventListener("change", () => {
+      const file = imageInput.files[0];
 
-    preview.innerHTML = `
-      <img src="${url}" alt="選択した画像">
-      <div style="margin-top:8px;font-size:14px;color:#666;">
-        ${imageWidth} × ${imageHeight}
-      </div>
-    `;
-  };
+      if (!file) {
+        imageBase64 = "";
+        naturalWidth = 0;
+        naturalHeight = 0;
 
-  img.src = url;
-});
+        preview.style.display = "none";
+        return;
+      }
 
-generateButton.addEventListener("click", async () => {
+      const reader = new FileReader();
 
-  if (!selectedImage) {
-    status.textContent = "画像を選択してください。";
-    return;
-  }
+      reader.onload = () => {
+        imageBase64 = reader.result;
 
-  if (!imageWidth || !imageHeight) {
-    status.textContent = "画像サイズを取得できませんでした。";
-    return;
-  }
+        preview.src = imageBase64;
+        preview.style.display = "block";
 
-  const prompt = document.getElementById("prompt").value;
+        const image = new Image();
 
-  // 元画像の縦横比を維持して生成サイズを決定
-  const maxWidth = 768;
-  const maxHeight = 736;
-  const multiple = 16;
+        image.onload = () => {
+          naturalWidth = image.naturalWidth;
+          naturalHeight = image.naturalHeight;
 
-  const scale = Math.min(
-    maxWidth / imageWidth,
-    maxHeight / imageHeight
-  );
+          console.log(
+            "Original image:",
+            naturalWidth,
+            "x",
+            naturalHeight
+          );
+        };
 
-  let width = Math.round(imageWidth * scale);
-  let height = Math.round(imageHeight * scale);
+        image.src = imageBase64;
+      };
 
-  // H3で扱いやすいよう16の倍数にする
-  width = Math.max(
-    multiple,
-    Math.round(width / multiple) * multiple
-  );
-
-  height = Math.max(
-    multiple,
-    Math.round(height / multiple) * multiple
-  );
-
-  // 最大サイズを超えないよう再調整
-  if (width > maxWidth) {
-    width = maxWidth;
-    height = Math.round((width * imageHeight / imageWidth) / multiple) * multiple;
-  }
-
-  if (height > maxHeight) {
-    height = maxHeight;
-    width = Math.round((height * imageWidth / imageHeight) / multiple) * multiple;
-  }
-
-  console.log("Original image:", imageWidth, "x", imageHeight);
-  console.log("Generation size:", width, "x", height);
-
-  generateButton.disabled = true;
-  status.textContent =
-    "画像を準備しています…\n" +
-    `生成サイズ: ${width} × ${height}`;
-
-  result.innerHTML = "";
-
-  try {
-
-    // 画像をBase64に変換
-    const imageBase64 = await fileToBase64(selectedImage);
-
-    status.textContent =
-      "RunPodに生成ジョブを送信しています…\n" +
-      `生成サイズ: ${width} × ${height}`;
-
-    // 生成ジョブを開始
-    const response = await fetch("/api/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        image: imageBase64,
-        prompt: prompt,
-        width: width,
-        height: height
-      })
+      reader.readAsDataURL(file);
     });
 
-    const data = await response.json();
+    // ---------------------------------------------------------
+    // Calculate H3 resolution
+    // ---------------------------------------------------------
 
-    if (!response.ok) {
-      throw new Error(data.error || "生成ジョブの開始に失敗しました。");
-    }
+    function calculateH3Resolution() {
+      const MAX_WIDTH = 768;
+      const MAX_HEIGHT = 736;
+      const STEP = 32;
 
-    if (!data.job_id) {
-      throw new Error("RunPodのジョブIDが取得できませんでした。");
-    }
-
-    const jobId = data.job_id;
-
-    status.textContent =
-      "動画を生成しています…\n" +
-      `生成サイズ: ${width} × ${height}\n` +
-      "ジョブID: " + jobId;
-
-    // RunPodの状態を確認
-    await pollJob(jobId);
-
-  } catch (error) {
-
-    console.error(error);
-    status.textContent = "エラー:\n" + error.message;
-
-    generateButton.disabled = false;
-  }
-});
-
-async function pollJob(jobId) {
-
-  const maxAttempts = 180;
-  const interval = 5000;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-
-    await sleep(interval);
-
-    const response = await fetch(
-      "/api/status?job_id=" + encodeURIComponent(jobId),
-      {
-        method: "GET",
-        cache: "no-store"
+      if (
+        !naturalWidth ||
+        !naturalHeight
+      ) {
+        return {
+          width: 768,
+          height: 736
+        };
       }
-    );
 
-    const data = await response.json();
+      const aspectRatio =
+        naturalWidth / naturalHeight;
 
-    if (!response.ok) {
-      throw new Error(
-        data.error || "RunPodの状態確認に失敗しました。"
-      );
-    }
+      let targetWidth;
+      let targetHeight;
 
-    console.log("RunPod status:", data);
+      // Start by fitting the image to the maximum height.
+      targetHeight = MAX_HEIGHT;
+      targetWidth = targetHeight * aspectRatio;
 
-    if (data.status === "IN_QUEUE") {
+      // If width exceeds the maximum,
+      // fit to the maximum width instead.
+      if (targetWidth > MAX_WIDTH) {
+        targetWidth = MAX_WIDTH;
+        targetHeight = targetWidth / aspectRatio;
+      }
 
-      status.textContent =
-        "生成待機中…\n" +
-        "ジョブID: " + jobId;
+      // H3 requires dimensions in 32-pixel increments.
+      let width =
+        Math.round(targetWidth / STEP) * STEP;
 
-      continue;
-    }
+      let height =
+        Math.round(targetHeight / STEP) * STEP;
 
-    if (data.status === "IN_PROGRESS") {
-
-      status.textContent =
-        "動画を生成しています…\n" +
-        "ジョブID: " + jobId;
-
-      continue;
-    }
-
-    if (data.status === "COMPLETED") {
-
-      const outputs = data.output?.outputs || [];
-
-      const video = outputs.find(
-        output =>
-          output.type === "video" ||
-          output.filename?.toLowerCase().endsWith(".mp4")
+      // Safety limits.
+      width = Math.max(
+        STEP,
+        Math.min(MAX_WIDTH, width)
       );
 
-      if (!video?.data) {
-        throw new Error(
-          "生成は完了しましたが、動画データが見つかりません。"
+      height = Math.max(
+        STEP,
+        Math.min(MAX_HEIGHT, height)
+      );
+
+      console.log(
+        "Original image:",
+        naturalWidth,
+        "x",
+        naturalHeight
+      );
+
+      console.log(
+        "Original aspect ratio:",
+        aspectRatio
+      );
+
+      console.log(
+        "H3 resolution:",
+        width,
+        "x",
+        height
+      );
+
+      return {
+        width,
+        height
+      };
+    }
+
+    // ---------------------------------------------------------
+    // Generate
+    // ---------------------------------------------------------
+
+    generateButton.addEventListener("click", async () => {
+
+      if (!imageBase64) {
+        alert("画像を選択してください。");
+        return;
+      }
+
+      if (
+        !naturalWidth ||
+        !naturalHeight
+      ) {
+        alert("画像サイズを取得できませんでした。");
+        return;
+      }
+
+      generateButton.disabled = true;
+
+      resultVideo.style.display = "none";
+      resultVideo.removeAttribute("src");
+      resultVideo.load();
+
+      statusElement.textContent =
+        "生成リクエストを送信しています…";
+
+      try {
+
+        // Calculate resolution from original image aspect ratio.
+        const resolution =
+          calculateH3Resolution();
+
+        console.log(
+          "Sending resolution:",
+          resolution.width,
+          "x",
+          resolution.height
         );
+
+        // -----------------------------------------------------
+        // Send generation request
+        // -----------------------------------------------------
+
+        const response = await fetch(
+          "/api/generate",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+              image: imageBase64,
+              prompt: promptInput.value,
+
+              width: resolution.width,
+              height: resolution.height
+            })
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+            "生成リクエストに失敗しました。"
+          );
+        }
+
+        if (!data.job_id) {
+          throw new Error(
+            "RunPodのjob IDを取得できませんでした。"
+          );
+        }
+
+        const jobId = data.job_id;
+
+        console.log(
+          "RunPod job ID:",
+          jobId
+        );
+
+        statusElement.textContent =
+          "生成を開始しました。\n" +
+          "Job ID: " +
+          jobId +
+          "\n\n" +
+          "生成中…";
+
+        // -----------------------------------------------------
+        // Poll status
+        // -----------------------------------------------------
+
+        const maxAttempts = 180;
+        let attempts = 0;
+
+        while (attempts < maxAttempts) {
+
+          attempts++;
+
+          await new Promise(
+            resolve => setTimeout(resolve, 5000)
+          );
+
+          const statusResponse =
+            await fetch(
+              "/api/status?job_id=" +
+              encodeURIComponent(jobId)
+            );
+
+          const statusData =
+            await statusResponse.json();
+
+          console.log(
+            "Status:",
+            statusData
+          );
+
+          if (!statusResponse.ok) {
+            throw new Error(
+              statusData.error ||
+              "ステータス取得に失敗しました。"
+            );
+          }
+
+          // ---------------------------------------------------
+          // COMPLETED
+          // ---------------------------------------------------
+
+          if (
+            statusData.status ===
+            "COMPLETED"
+          ) {
+
+            statusElement.textContent =
+              "生成完了。";
+
+            const outputs =
+              statusData.output &&
+              statusData.output.outputs;
+
+            if (
+              !outputs ||
+              !outputs.length
+            ) {
+              throw new Error(
+                "生成結果の動画が見つかりません。"
+              );
+            }
+
+            const videoOutput =
+              outputs.find(
+                item =>
+                  item.type === "video" ||
+                  item.data ||
+                  item.base64
+              );
+
+            if (!videoOutput) {
+              throw new Error(
+                "動画出力を取得できませんでした。"
+              );
+            }
+
+            const videoBase64 =
+              videoOutput.data ||
+              videoOutput.base64;
+
+            if (!videoBase64) {
+              throw new Error(
+                "動画のBase64データがありません。"
+              );
+            }
+
+            resultVideo.src =
+              "data:video/mp4;base64," +
+              videoBase64;
+
+            resultVideo.style.display =
+              "block";
+
+            resultVideo.load();
+
+            break;
+          }
+
+          // ---------------------------------------------------
+          // FAILED
+          // ---------------------------------------------------
+
+          if (
+            statusData.status ===
+            "FAILED"
+          ) {
+
+            const errorMessage =
+              statusData.error ||
+              statusData.output?.error ||
+              "RunPodで動画生成に失敗しました。";
+
+            throw new Error(
+              errorMessage
+            );
+          }
+
+          // ---------------------------------------------------
+          // IN_QUEUE / IN_PROGRESS
+          // ---------------------------------------------------
+
+          statusElement.textContent =
+            "生成中…\n" +
+            "状態: " +
+            (statusData.status || "UNKNOWN") +
+            "\n" +
+            "経過: 約" +
+            (attempts * 5) +
+            "秒";
+        }
+
+        if (attempts >= maxAttempts) {
+          throw new Error(
+            "生成が15分以内に完了しませんでした。"
+          );
+        }
+
+      } catch (error) {
+
+        console.error(
+          "Generation error:",
+          error
+        );
+
+        statusElement.textContent =
+          "エラー:\n" +
+          (error.message ||
+            "不明なエラーが発生しました。");
+
+      } finally {
+
+        generateButton.disabled = false;
       }
+    });
+  </script>
 
-      status.textContent = "生成完了";
-
-      result.innerHTML = `
-        <video controls autoplay playsinline>
-          <source src="data:video/mp4;base64,${video.data}" type="video/mp4">
-        </video>
-      `;
-
-      generateButton.disabled = false;
-
-      return;
-    }
-
-    if (data.status === "FAILED") {
-      throw new Error(
-        "RunPodで動画生成に失敗しました。\n" +
-        JSON.stringify(data.error || data.output || data)
-      );
-    }
-
-    status.textContent =
-      "処理中… (" + data.status + ")\n" +
-      "ジョブID: " + jobId;
-  }
-
-  throw new Error(
-    "生成が長時間完了しませんでした。ジョブID: " + jobId
-  );
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const result = reader.result;
-
-      // data:image/jpeg;base64,... の
-      // "data:image/jpeg;base64," 部分を除去
-      const base64 = result.split(",")[1];
-
-      resolve(base64);
-    };
-
-    reader.onerror = reject;
-
-    reader.readAsDataURL(file);
-  });
-}
-</script></body>
+</body>
 </html>
