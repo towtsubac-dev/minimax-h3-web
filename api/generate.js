@@ -39,8 +39,8 @@ export default async function handler(req, res) {
         action: "h3_generate",
         image,
         prompt: prompt || "",
-        width: width || 576,
-        height: height || 768,
+        width: 480,
+        height: 760,
         length: 124,
         steps: 8,
         seed: Math.floor(Math.random() * 1000000000)
