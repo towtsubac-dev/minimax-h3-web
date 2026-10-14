@@ -50,17 +50,36 @@ export default {
         }
       );
 
-      const data = await runpodResponse.json();
+const responseText = await runpodResponse.text();
 
-      if (!runpodResponse.ok) {
-        return Response.json(
-          {
-            error: "RunPod API error",
-            details: data
-          },
-          { status: 502 }
-        );
-      }
+console.log("RunPod HTTP status:", runpodResponse.status);
+console.log("RunPod response:", responseText);
+
+let data;
+
+try {
+  data = JSON.parse(responseText);
+} catch {
+  return Response.json(
+    {
+      error: "RunPodからJSONではないレスポンスが返りました。",
+      status: runpodResponse.status,
+      response: responseText
+    },
+    { status: 502 }
+  );
+}
+
+if (!runpodResponse.ok) {
+  return Response.json(
+    {
+      error: "RunPod API error",
+      status: runpodResponse.status,
+      details: data
+    },
+    { status: 502 }
+  );
+}
 
       if (data.status !== "COMPLETED") {
         return Response.json(
