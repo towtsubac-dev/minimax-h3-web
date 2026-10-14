@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MiniMax H3 Video</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #222;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      font-size: 24px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.08);
+    }
+
+    label {
+      display: block;
+      margin: 16px 0 8px;
+      font-weight: 600;
+    }
+
+    input[type="file"],
+    textarea {
+      width: 100%;
+    }
+
+    textarea {
+      min-height: 120px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      resize: vertical;
+      font: inherit;
+    }
+
+    .preview {
+      margin-top: 15px;
+      text-align: center;
+    }
+
+    .preview img {
+      max-width: 100%;
+      max-height: 400px;
+      border-radius: 12px;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 20px;
+      padding: 14px;
+      border: 0;
+      border-radius: 10px;
+      background: #222;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: .5;
+    }
+
+    #status {
+      margin-top: 15px;
+      text-align: center;
+      white-space: pre-wrap;
+    }
+
+    #result {
+      margin-top: 20px;
+    }
+
+    video {
+      width: 100%;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>MiniMax H3 Video</h1>
+
+  <div class="card">
+
+    <label for="image">画像</label>
+    <input id="image" type="file" accept="image/*">
+
+    <div id="preview" class="preview"></div>
+
+    <label for="prompt">プロンプト</label>
+
+    <textarea id="prompt">A realistic subject remains in the same position and composition. Subtle natural movement and blinking. Keep the appearance and body shape consistent throughout the video. Keep the camera completely stable with no zoom or reframing.</textarea>
+
+    <button id="generate">動画生成</button>
+
+    <div id="status"></div>
+
+    <div id="result"></div>
+
+  </div>
+
+</div>
+
+<script>
+const imageInput = document.getElementById("image");
+const preview = document.getElementById("preview");
+const generateButton = document.getElementById("generate");
+const status = document.getElementById("status");
+const result = document.getElementById("result");
+
+let selectedImage = null;
+
+imageInput.addEventListener("change", () => {
+  const file = imageInput.files[0];
+
+  if (!file) {
+    selectedImage = null;
+    preview.innerHTML = "";
+    return;
+  }
+
+  selectedImage = file;
+
+  const url = URL.createObjectURL(file);
+
+  preview.innerHTML = `
+    <img src="${url}" alt="選択した画像">
+  `;
+});
+
+generateButton.addEventListener("click", async () => {
+
+  if (!selectedImage) {
+    status.textContent = "画像を選択してください。";
+    return;
+  }
+
+  const prompt = document.getElementById("prompt").value;
+
+  generateButton.disabled = true;
+  status.textContent = "動画を生成しています…";
+  result.innerHTML = "";
+
+  try {
+
+    const formData = new FormData();
+
+    formData.append("image", selectedImage);
+    formData.append("prompt", prompt);
+
+    const response = await fetch("/api/generate", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "生成に失敗しました。");
+    }
+
+    if (data.video_url) {
+      status.textContent = "生成完了";
+
+      result.innerHTML = `
+        <video controls autoplay>
+          <source src="${data.video_url}" type="video/mp4">
+        </video>
+      `;
+    } else {
+      status.textContent = "生成結果を取得しましたが、動画URLがありません。";
+      console.log(data);
+    }
+
+  } catch (error) {
+
+    console.error(error);
+    status.textContent = "エラー:\n" + error.message;
+
+  } finally {
+
+    generateButton.disabled = false;
+
+  }
+});
+</script>
+
+</body>
+</html>
