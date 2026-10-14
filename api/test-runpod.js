@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     console.log("TEST 3: before RunPod fetch");
 
     const response = await fetch(
-      "https://api.runpod.ai/v2/18lt7ar99rsrfw/runsync",
+      "https://api.runpod.ai/v2/18lt7ar99rsrfw/run",
       {
         method: "POST",
         headers: {
