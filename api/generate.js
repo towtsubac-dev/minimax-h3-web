@@ -1,20 +1,34 @@
-export default async function handler(req, res) {
+export default async function handler(req) {
   if (req.method !== "POST") {
-    return res.status(405).json({
-      error: "Method not allowed"
-    });
+    return new Response(
+      JSON.stringify({ error: "Method not allowed" }),
+      {
+        status: 405,
+        headers: {
+          "Content-Type": "application/json"
+        }
+      }
+    );
   }
 
   try {
-    const { image, prompt } = req.body;
+    const body = await req.json();
+
+    const { image, prompt } = body;
 
     if (!image) {
-      return res.status(400).json({
-        error: "画像がありません。"
-      });
+      return new Response(
+        JSON.stringify({ error: "画像がありません。" }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      );
     }
 
-    const response = await fetch(
+    const runpodResponse = await fetch(
       "https://api.runpod.ai/v2/18lt7ar99rsrfw/runsync",
       {
         method: "POST",
@@ -37,17 +51,36 @@ export default async function handler(req, res) {
       }
     );
 
-    const data = await response.json();
+    const data = await runpodResponse.json();
 
-    if (!response.ok) {
-      return res.status(response.status).json(data);
+    if (!runpodResponse.ok) {
+      return new Response(
+        JSON.stringify({
+          error: "RunPod API error",
+          details: data
+        }),
+        {
+          status: runpodResponse.status,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      );
     }
 
     if (data.status !== "COMPLETED") {
-      return res.status(500).json({
-        error: "RunPod job failed",
-        details: data
-      });
+      return new Response(
+        JSON.stringify({
+          error: "RunPod job failed",
+          details: data
+        }),
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      );
     }
 
     const outputs = data.output?.outputs || [];
@@ -58,22 +91,46 @@ export default async function handler(req, res) {
         output.filename?.toLowerCase().endsWith(".mp4")
     );
 
-    if (!video) {
-      return res.status(500).json({
-        error: "生成された動画が見つかりません。",
-        details: data.output
-      });
+    if (!video || !video.data) {
+      return new Response(
+        JSON.stringify({
+          error: "生成された動画が見つかりません。",
+          details: data.output
+        }),
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      );
     }
 
-    return res.status(200).json({
-      video_url: `data:video/mp4;base64,${video.data}`
-    });
+    return new Response(
+      JSON.stringify({
+        video_url: `data:video/mp4;base64,${video.data}`
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json"
+        }
+      }
+    );
 
   } catch (error) {
     console.error(error);
 
-    return res.status(500).json({
-      error: error.message
-    });
+    return new Response(
+      JSON.stringify({
+        error: error.message || "サーバーエラー"
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json"
+        }
+      }
+    );
   }
 }
