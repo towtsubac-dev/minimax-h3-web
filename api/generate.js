@@ -119,6 +119,14 @@ export default async function handler(req, res) {
       });
     }
 
+    // Diagnostic logging: record settings only, never prompt or image data.
+    console.log("H3 REQUEST SETTINGS:", JSON.stringify({
+      mode,
+      duration: Number(duration),
+      requestedLoras: Array.isArray(requestedLoras) ? requestedLoras : null,
+      normalizedLoras
+    }));
+
     const apiKey = process.env.RUNPOD_API_KEY;
 
     if (!apiKey) {
@@ -201,6 +209,12 @@ export default async function handler(req, res) {
       "RUNPOD PAYLOAD MB:",
       (payloadBytes / (1024 * 1024)).toFixed(2)
     );
+
+    console.log("RUNPOD INPUT SETTINGS:", JSON.stringify({
+      action: input.action,
+      length: input.length,
+      loras: input.loras
+    }));
 
     // RunPodへの接続
     const controller = new AbortController();
