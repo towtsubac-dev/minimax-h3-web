@@ -41,6 +41,33 @@
       padding: 10px;
     }
 
+    .mode-tabs {
+      display: flex;
+      gap: 8px;
+    }
+
+    .mode-tab {
+      flex: 1;
+      width: auto;
+      padding: 12px 10px;
+      border: 1px solid #888;
+      border-radius: 8px;
+      background: #f3f3f3;
+      color: #222;
+      font-weight: 600;
+    }
+
+    .mode-tab[aria-selected="true"] {
+      background: #222;
+      border-color: #222;
+      color: #fff;
+    }
+
+    .mode-tab:disabled {
+      cursor: not-allowed;
+      opacity: 0.65;
+    }
+
     textarea {
       min-height: 120px;
       padding: 10px;
@@ -135,12 +162,14 @@
 
   <!-- 生成モード -->
   <div class="section">
-    <label for="modeSelect">生成モード</label>
+    <label>生成モード</label>
 
-    <select id="modeSelect">
-      <option value="image">画像 → 動画</option>
-      <option value="text">テキスト → 動画</option>
-    </select>
+    <div class="mode-tabs" role="tablist" aria-label="生成モード">
+      <button type="button" class="mode-tab" id="imageModeTab"
+        role="tab" aria-selected="true" aria-controls="imageSection">画像 → 動画</button>
+      <button type="button" class="mode-tab" id="textModeTab"
+        role="tab" aria-selected="false" aria-controls="prompt">テキスト → 動画</button>
+    </div>
   </div>
 
   <!-- 動画の長さ -->
@@ -262,8 +291,20 @@
     // Elements
     // =========================================================
 
-    const modeSelect =
-      document.getElementById("modeSelect");
+    const imageModeTab = document.getElementById("imageModeTab");
+    const textModeTab = document.getElementById("textModeTab");
+    let currentMode = "image";
+
+    function setMode(mode) {
+      currentMode = mode;
+      imageModeTab.setAttribute("aria-selected", String(mode === "image"));
+      textModeTab.setAttribute("aria-selected", String(mode === "text"));
+      updateModeUI();
+      setStatus("");
+    }
+
+    imageModeTab.addEventListener("click", () => setMode("image"));
+    textModeTab.addEventListener("click", () => setMode("text"));
 
     const durationSelect =
       document.getElementById("durationSelect");
@@ -354,7 +395,7 @@
     // =========================================================
 
     function updateGenerateButton() {
-      const mode = modeSelect.value;
+      const mode = currentMode;
       const hasPrompt = promptInput.value.trim().length > 0;
 
       if (mode === "image") {
@@ -371,7 +412,7 @@
     // =========================================================
 
     function updateModeUI() {
-      const mode = modeSelect.value;
+      const mode = currentMode;
       const isImageMode = mode === "image";
 
       imageSection.style.display =
@@ -389,11 +430,6 @@
 
       updateGenerateButton();
     }
-
-    modeSelect.addEventListener("change", () => {
-      updateModeUI();
-      setStatus("");
-    });
 
     promptInput.addEventListener("input", () => {
       updateGenerateButton();
@@ -547,7 +583,7 @@
       if (
         !naturalWidth ||
         !naturalHeight ||
-        modeSelect.value !== "image"
+        currentMode !== "image"
       ) {
         resolutionInfo.style.display = "none";
         return;
@@ -665,9 +701,12 @@
     // =========================================================
 
     generateButton.addEventListener("click", async () => {
-      const mode = modeSelect.value;
+      // Capture every setting at click time so later UI changes cannot
+      // alter the payload while image preparation is awaiting completion.
+      const mode = currentMode;
       const duration = Number(durationSelect.value);
       const prompt = promptInput.value.trim();
+      const selectedLoras = getSelectedLoras();
 
       if (!prompt) {
         setStatus(
@@ -686,6 +725,11 @@
       }
 
       generateButton.disabled = true;
+      const controlsToLock = [
+        imageModeTab, textModeTab, durationSelect, imageInput, promptInput,
+        ...loraControls.flatMap(control => [control.checkbox, control.strength])
+      ];
+      controlsToLock.forEach(control => { control.disabled = true; });
 
       videoElement.pause();
       videoElement.style.display = "none";
@@ -734,7 +778,7 @@
           prompt,
           width,
           height,
-          loras: getSelectedLoras()
+          loras: selectedLoras
         };
 
         // 画像モードだけ画像データを送る
@@ -935,6 +979,8 @@
         );
 
       } finally {
+        controlsToLock.forEach(control => { control.disabled = false; });
+        updateModeUI();
         updateGenerateButton();
       }
     });
