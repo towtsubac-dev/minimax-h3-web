@@ -15,7 +15,8 @@ export default async function handler(req, res) {
       height,
       mode = "image",
       duration = 5,
-      lora = "none"
+      lora = "none",
+      loras
     } = req.body || {};
 
     // 秒数からH3のフレーム数へ変換
@@ -26,9 +27,62 @@ export default async function handler(req, res) {
       10: 244
     };
 
-    if (!["none", "hmnsfw", "free_pussy", "hmpenis"].includes(lora)) {
+    const loraDefaults = {
+      hmnsfw: 0.7,
+      free_pussy: 1.0,
+      hmpenis: 1.0
+    };
+
+    // Keep compatibility with older clients that send a single "lora" value.
+    let requestedLoras = loras;
+    if (requestedLoras === undefined) {
+      requestedLoras =
+        lora && lora !== "none"
+          ? [{
+              name: lora,
+              strength: loraDefaults[lora]
+            }]
+          : [];
+    }
+
+    if (!Array.isArray(requestedLoras) || requestedLoras.length > 3) {
       return res.status(400).json({
         error: "追加LoRAの指定が不正です。"
+      });
+    }
+
+    const normalizedLoras = [];
+    const selectedLoraNames = new Set();
+
+    for (const item of requestedLoras) {
+      if (!item || typeof item !== "object" ||
+          !Object.prototype.hasOwnProperty.call(loraDefaults, item.name)) {
+        return res.status(400).json({
+          error: "追加LoRAの指定が不正です。"
+        });
+      }
+
+      if (selectedLoraNames.has(item.name)) {
+        return res.status(400).json({
+          error: "同じLoRAを重複して指定できません。"
+        });
+      }
+      selectedLoraNames.add(item.name);
+
+      const strength =
+        item.strength === undefined
+          ? loraDefaults[item.name]
+          : Number(item.strength);
+
+      if (!Number.isFinite(strength) || strength < 0 || strength > 1.5) {
+        return res.status(400).json({
+          error: "LoRA強度は0.0〜1.5の範囲で指定してください。"
+        });
+      }
+
+      normalizedLoras.push({
+        name: item.name,
+        strength
       });
     }
 
@@ -128,7 +182,7 @@ export default async function handler(req, res) {
       length: durationLengths[String(duration)],
       steps: 8,
       seed: Math.floor(Math.random() * 1000000000),
-      lora
+      loras: normalizedLoras
     };
 
     // 画像モードの場合だけ画像を送信
