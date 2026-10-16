@@ -3,244 +3,68 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <title>MiniMax H3 動画生成</title>
-
   <style>
-    body {
-      font-family: sans-serif;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-      line-height: 1.6;
-    }
-
-    h1 {
-      font-size: 24px;
-    }
-
-    .section {
-      margin-bottom: 20px;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: bold;
-    }
-
-    input[type="file"],
-    textarea,
-    select {
-      width: 100%;
-      box-sizing: border-box;
-      font-size: 16px;
-    }
-
-    select {
-      padding: 10px;
-    }
-
-    .mode-tabs {
-      display: flex;
-      gap: 8px;
-    }
-
-    .mode-tab {
-      flex: 1;
-      width: auto;
-      padding: 12px 10px;
-      border: 1px solid #888;
-      border-radius: 8px;
-      background: #f3f3f3;
-      color: #222;
-      font-weight: 600;
-    }
-
-    .mode-tab[aria-selected="true"] {
-      background: #222;
-      border-color: #222;
-      color: #fff;
-    }
-
-    .mode-tab:disabled {
-      cursor: not-allowed;
-      opacity: 0.65;
-    }
-
-    textarea {
-      min-height: 120px;
-      padding: 10px;
-      resize: vertical;
-    }
-
-    button {
-      width: 100%;
-      padding: 14px 24px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-
-    #preview {
-      max-width: 100%;
-      max-height: 500px;
-      display: none;
-      margin-top: 10px;
-    }
-
-    #video {
-      width: 100%;
-      max-height: 700px;
-      display: none;
-      margin-top: 20px;
-    }
-
-    .download-link {
-      display: none;
-      box-sizing: border-box;
-      margin-top: 12px;
-      padding: 14px 24px;
-      border-radius: 6px;
-      background: #222;
-      color: #fff;
-      text-align: center;
-      text-decoration: none;
-      font-size: 16px;
-      font-weight: 600;
-    }
-
-    .prompt-history-item {
-      display: flex;
-      align-items: stretch;
-      gap: 8px;
-      margin: 8px 0;
-    }
-
-    .prompt-history-use {
-      flex: 1;
-      min-width: 0;
-      text-align: left;
-      padding: 10px;
-      overflow-wrap: anywhere;
-    }
-
-    .prompt-history-delete {
-      width: auto;
-      flex: 0 0 auto;
-      padding: 10px 12px;
-    }
-
-    .history-item {
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 12px;
-      margin: 12px 0;
-    }
-
-    .history-meta {
-      font-size: 14px;
-      color: #555;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-    }
-
-    .history-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .history-actions button {
-      flex: 1;
-      padding: 10px 8px;
-    }
-
-    .history-empty {
-      color: #666;
-      font-size: 14px;
-    }
-
-    #status {
-      margin-top: 15px;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .info {
-      margin-top: 10px;
-      padding: 10px;
-      background: #f5f5f5;
-      border-radius: 6px;
-      font-size: 14px;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .lora-option {
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      padding: 12px;
-      margin: 10px 0;
-    }
-
-    .lora-check {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-
-    .lora-check input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      flex: 0 0 auto;
-    }
-
-    .lora-strength label {
-      margin-bottom: 4px;
-      font-weight: normal;
-    }
-
-    input[type="range"] {
-      width: 100%;
-      box-sizing: border-box;
-    }
-
-    .error {
-      color: #c00;
-    }
-
-    .success {
-      color: #080;
+    body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    h1 { font-size: 24px; }
+    .section { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 8px; font-weight: bold; }
+    input[type="file"], textarea, select { width: 100%; box-sizing: border-box; font-size: 16px; }
+    select { padding: 10px; }
+    .mode-tabs { display: flex; gap: 8px; }
+    .mode-tab { flex: 1; width: auto; padding: 12px 10px; border: 1px solid #888; border-radius: 8px; background: #f3f3f3; color: #222; font-weight: 600; }
+    .mode-tab[aria-selected="true"] { background: #222; border-color: #222; color: #fff; }
+    .mode-tab:disabled { cursor: not-allowed; opacity: .65; }
+    textarea { min-height: 120px; padding: 10px; resize: vertical; }
+    button { width: 100%; padding: 14px 24px; font-size: 16px; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .6; }
+    #preview { max-width: 100%; max-height: 500px; display: none; margin-top: 10px; }
+    #video { width: 100%; max-height: 700px; display: none; margin-top: 20px; }
+    .download-link { display: none; box-sizing: border-box; margin-top: 12px; padding: 14px 24px; border-radius: 6px; background: #222; color: #fff; text-align: center; text-decoration: none; font-size: 16px; font-weight: 600; }
+    #promptHistoryDropdown { margin-top: 10px; }
+    #promptHistoryDropdown summary { cursor: pointer; padding: 10px 12px; border: 1px solid #ccc; border-radius: 8px; font-weight: 600; list-style-position: inside; }
+    #promptHistoryDropdown[open] summary { margin-bottom: 8px; }
+    .prompt-history-item { display: flex; align-items: stretch; gap: 8px; margin: 8px 0; }
+    .prompt-history-use { flex: 1; min-width: 0; width: auto; text-align: left; padding: 10px; overflow: hidden; overflow-wrap: anywhere; }
+    .prompt-history-delete { width: auto; flex: 0 0 auto; padding: 10px 12px; }
+    .history-item { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 12px; border: 1px solid #ccc; border-radius: 8px; padding: 10px; margin: 12px 0; }
+    .history-thumbnail { width: 140px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: #000; cursor: pointer; display: block; }
+    .history-content { min-width: 0; }
+    .history-prompt { display: block; overflow-wrap: anywhere; }
+    .history-meta { font-size: 14px; color: #555; white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 6px; }
+    .history-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .history-actions button { flex: 1; padding: 10px 8px; }
+    .history-empty { color: #666; font-size: 14px; }
+    #status { margin-top: 15px; white-space: pre-wrap; word-break: break-word; }
+    .info { margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 6px; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+    .lora-option { border: 1px solid #ccc; border-radius: 6px; padding: 12px; margin: 10px 0; }
+    .lora-check { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .lora-check input[type="checkbox"] { width: 18px; height: 18px; flex: 0 0 auto; }
+    .lora-strength label { margin-bottom: 4px; font-weight: normal; }
+    input[type="range"] { width: 100%; box-sizing: border-box; }
+    .error { color: #c00; }
+    .success { color: #080; }
+    @media (max-width: 600px) {
+      .history-item { grid-template-columns: 110px minmax(0, 1fr); gap: 10px; }
+      .history-thumbnail { width: 110px; }
+      .history-actions { flex-wrap: wrap; }
+      .history-actions button { min-width: 80px; }
     }
   </style>
 </head>
-
 <body>
-
   <h1>MiniMax H3 動画生成</h1>
 
-  <!-- 生成モード -->
   <div class="section">
     <label>生成モード</label>
-
     <div class="mode-tabs" role="tablist" aria-label="生成モード">
-      <button type="button" class="mode-tab" id="imageModeTab"
-        role="tab" aria-selected="true" aria-controls="imageSection">画像 → 動画</button>
-      <button type="button" class="mode-tab" id="textModeTab"
-        role="tab" aria-selected="false" aria-controls="prompt">テキスト → 動画</button>
+      <button type="button" class="mode-tab" id="imageModeTab" role="tab" aria-selected="true" aria-controls="imageSection">画像 → 動画</button>
+      <button type="button" class="mode-tab" id="textModeTab" role="tab" aria-selected="false" aria-controls="prompt">テキスト → 動画</button>
     </div>
   </div>
 
-  <!-- 動画の長さ -->
   <div class="section">
     <label for="durationSelect">動画の長さ</label>
-
     <select id="durationSelect">
       <option value="3">3秒</option>
       <option value="5" selected>5秒</option>
@@ -249,120 +73,48 @@
     </select>
   </div>
 
-  <!-- Optional LoRAs -->
   <div class="section">
     <label>追加LoRA（複数選択可）</label>
-
     <div class="lora-option">
-      <label class="lora-check" for="loraHmnsfw">
-        <input type="checkbox" id="loraHmnsfw" value="hmnsfw">
-        HMNSFW AIO V2.5
-      </label>
-      <div class="lora-strength">
-        <label for="strengthHmnsfw">強度：<span id="strengthHmnsfwValue">0.70</span></label>
-        <input type="range" id="strengthHmnsfw" min="0" max="1.5" step="0.05" value="0.7">
-      </div>
+      <label class="lora-check" for="loraHmnsfw"><input type="checkbox" id="loraHmnsfw" value="hmnsfw">HMNSFW AIO V2.5</label>
+      <div class="lora-strength"><label for="strengthHmnsfw">強度：<span id="strengthHmnsfwValue">0.70</span></label><input type="range" id="strengthHmnsfw" min="0" max="1.5" step="0.05" value="0.7"></div>
     </div>
-
     <div class="lora-option">
-      <label class="lora-check" for="loraFreePussy">
-        <input type="checkbox" id="loraFreePussy" value="free_pussy">
-        Free Pussy
-      </label>
-      <div class="lora-strength">
-        <label for="strengthFreePussy">強度：<span id="strengthFreePussyValue">1.00</span></label>
-        <input type="range" id="strengthFreePussy" min="0" max="1.5" step="0.05" value="1.0">
-      </div>
+      <label class="lora-check" for="loraFreePussy"><input type="checkbox" id="loraFreePussy" value="free_pussy">Free Pussy</label>
+      <div class="lora-strength"><label for="strengthFreePussy">強度：<span id="strengthFreePussyValue">1.00</span></label><input type="range" id="strengthFreePussy" min="0" max="1.5" step="0.05" value="1.0"></div>
     </div>
-
     <div class="lora-option">
-      <label class="lora-check" for="loraHmpenis">
-        <input type="checkbox" id="loraHmpenis" value="hmpenis">
-        HMPenis
-      </label>
-      <div class="lora-strength">
-        <label for="strengthHmpenis">強度：<span id="strengthHmpenisValue">1.00</span></label>
-        <input type="range" id="strengthHmpenis" min="0" max="1.5" step="0.05" value="1.0">
-      </div>
+      <label class="lora-check" for="loraHmpenis"><input type="checkbox" id="loraHmpenis" value="hmpenis">HMPenis</label>
+      <div class="lora-strength"><label for="strengthHmpenis">強度：<span id="strengthHmpenisValue">1.00</span></label><input type="range" id="strengthHmpenis" min="0" max="1.5" step="0.05" value="1.0"></div>
     </div>
-
-    <div class="info">
-      チェックしたLoRAをすべて同時に適用します。強度は各LoRAごとに0.00〜1.50で調整できます。
-      選択したLoRAのトリガーワードはプロンプトの先頭に自動追加されます。
-      何も選択しない場合は、これまでどおりTurbo LoRAのみを使用します。
-    </div>
+    <div class="info">チェックしたLoRAをすべて同時に適用します。強度は各LoRAごとに0.00〜1.50で調整できます。
+選択したLoRAのトリガーワードはプロンプトの先頭に自動追加されます。
+何も選択しない場合は、これまでどおりTurbo LoRAのみを使用します。</div>
   </div>
 
-  <!-- 画像選択 -->
   <div class="section" id="imageSection">
-
     <label for="imageInput">画像</label>
-
-    <input
-      type="file"
-      id="imageInput"
-      accept="image/*"
-    >
-
-    <img
-      id="preview"
-      alt="選択した画像のプレビュー"
-    >
-
-    <div
-      id="resolutionInfo"
-      class="info"
-      style="display:none;"
-    ></div>
-
+    <input type="file" id="imageInput" accept="image/*">
+    <img id="preview" alt="選択した画像のプレビュー">
+    <div id="resolutionInfo" class="info" style="display:none;"></div>
   </div>
 
-  <!-- プロンプト -->
   <div class="section">
-
     <label for="prompt">プロンプト</label>
-
-    <textarea
-      id="prompt"
-      placeholder="動画にしたい動きや場面を入力してください"
-    ></textarea>
-
+    <textarea id="prompt" placeholder="動画にしたい動きや場面を入力してください"></textarea>
     <div class="section" id="promptHistorySection">
-      <label>プロンプト履歴（最大5件）</label>
-      <div class="info">動画生成を開始するとプロンプトが自動保存されます。履歴をタップすると入力欄に戻せます。</div>
-      <div id="promptHistoryList"></div>
+      <details id="promptHistoryDropdown">
+        <summary>History</summary>
+        <div id="promptHistoryList"></div>
+      </details>
     </div>
-
   </div>
 
-  <!-- 生成ボタン -->
-  <div class="section">
-
-    <button
-      id="generateButton"
-      disabled
-    >
-      動画を生成
-    </button>
-
-  </div>
-
-  <!-- 状態表示 -->
+  <div class="section"><button id="generateButton" disabled>動画を生成</button></div>
   <div id="status" role="status" aria-live="polite"></div>
 
-  <!-- 生成動画 -->
-  <video
-    id="video"
-    controls
-    playsinline
-  ></video>
-
-  <a
-    id="downloadVideoButton"
-    class="download-link"
-    href="#"
-    download="minimax-h3-video.mp4"
-  >動画を保存</a>
+  <video id="video" controls playsinline></video>
+  <a id="downloadVideoButton" class="download-link" href="#" download="minimax-h3-video.mp4">動画を保存</a>
 
   <section class="section" id="historySection">
     <h2>生成履歴</h2>
@@ -370,1022 +122,145 @@
     <div id="historyList" aria-live="polite"></div>
   </section>
 
-  <script>
-    // =========================================================
-    // Elements
-    // =========================================================
+<script>
+const imageModeTab = document.getElementById("imageModeTab");
+const textModeTab = document.getElementById("textModeTab");
+let currentMode = "image";
+function setMode(mode) { currentMode = mode; imageModeTab.setAttribute("aria-selected", String(mode === "image")); textModeTab.setAttribute("aria-selected", String(mode === "text")); updateModeUI(); setStatus(""); }
+imageModeTab.addEventListener("click", () => setMode("image"));
+textModeTab.addEventListener("click", () => setMode("text"));
 
-    const imageModeTab = document.getElementById("imageModeTab");
-    const textModeTab = document.getElementById("textModeTab");
-    let currentMode = "image";
+const durationSelect = document.getElementById("durationSelect");
+const loraControls = [
+  { name:"hmnsfw", checkbox:document.getElementById("loraHmnsfw"), strength:document.getElementById("strengthHmnsfw"), value:document.getElementById("strengthHmnsfwValue") },
+  { name:"free_pussy", checkbox:document.getElementById("loraFreePussy"), strength:document.getElementById("strengthFreePussy"), value:document.getElementById("strengthFreePussyValue") },
+  { name:"hmpenis", checkbox:document.getElementById("loraHmpenis"), strength:document.getElementById("strengthHmpenis"), value:document.getElementById("strengthHmpenisValue") }
+];
+function getSelectedLoras() { return loraControls.filter(c => c.checkbox.checked).map(c => ({ name:c.name, strength:Number(c.strength.value) })); }
+for (const control of loraControls) control.strength.addEventListener("input", () => { control.value.textContent = Number(control.strength.value).toFixed(2); });
 
-    function setMode(mode) {
-      currentMode = mode;
-      imageModeTab.setAttribute("aria-selected", String(mode === "image"));
-      textModeTab.setAttribute("aria-selected", String(mode === "text"));
-      updateModeUI();
-      setStatus("");
+const imageSection = document.getElementById("imageSection");
+const imageInput = document.getElementById("imageInput");
+const preview = document.getElementById("preview");
+const promptInput = document.getElementById("prompt");
+const promptHistoryList = document.getElementById("promptHistoryList");
+const promptHistoryDropdown = document.getElementById("promptHistoryDropdown");
+const PROMPT_HISTORY_KEY = "minimax-h3-prompt-history";
+const PROMPT_HISTORY_LIMIT = 5;
+const PROMPT_HISTORY_DISPLAY_LIMIT = 300;
+function readPromptHistory() {
+  try { const saved = JSON.parse(localStorage.getItem(PROMPT_HISTORY_KEY) || "[]"); return Array.isArray(saved) ? saved.filter(item => typeof item === "string" && item.trim()).slice(0, PROMPT_HISTORY_LIMIT) : []; }
+  catch (error) { console.warn("Prompt history could not be read:", error); return []; }
+}
+function savePromptHistory(prompt) {
+  const normalizedPrompt = prompt.trim(); if (!normalizedPrompt) return;
+  const history = readPromptHistory().filter(item => item !== normalizedPrompt); history.unshift(normalizedPrompt);
+  try { localStorage.setItem(PROMPT_HISTORY_KEY, JSON.stringify(history.slice(0, PROMPT_HISTORY_LIMIT))); renderPromptHistory(); }
+  catch (error) { console.warn("Prompt history could not be saved:", error); setStatus("プロンプト履歴を保存できませんでした。ブラウザの保存領域を確認してください。", "error"); }
+}
+function truncatePromptForDisplay(prompt) { return prompt.length > PROMPT_HISTORY_DISPLAY_LIMIT ? prompt.slice(0, PROMPT_HISTORY_DISPLAY_LIMIT) + "…" : prompt; }
+function renderPromptHistory() {
+  promptHistoryList.replaceChildren();
+  const history = readPromptHistory();
+  if (!history.length) { const empty = document.createElement("p"); empty.className="history-empty"; empty.textContent="まだ履歴はありません。"; promptHistoryList.appendChild(empty); return; }
+  history.forEach((savedPrompt, index) => {
+    const row = document.createElement("div"); row.className="prompt-history-item";
+    const useButton = document.createElement("button"); useButton.type="button"; useButton.className="prompt-history-use"; useButton.textContent=truncatePromptForDisplay(savedPrompt); useButton.title="このプロンプトを入力欄に戻す";
+    useButton.addEventListener("click", () => { promptInput.value=savedPrompt; updateGenerateButton(); promptInput.focus(); promptInput.scrollIntoView({behavior:"smooth",block:"center"}); });
+    const deleteButton = document.createElement("button"); deleteButton.type="button"; deleteButton.className="prompt-history-delete"; deleteButton.textContent="削除"; deleteButton.setAttribute("aria-label", `プロンプト履歴 ${index+1} 件目を削除`);
+    deleteButton.addEventListener("click", () => { const nextHistory=readPromptHistory().filter((_,itemIndex)=>itemIndex!==index); try { localStorage.setItem(PROMPT_HISTORY_KEY,JSON.stringify(nextHistory)); renderPromptHistory(); } catch(error) { console.warn("Prompt history could not be updated:",error); } });
+    row.append(useButton,deleteButton); promptHistoryList.appendChild(row);
+  });
+}
+
+const generateButton = document.getElementById("generateButton");
+const statusElement = document.getElementById("status");
+const videoElement = document.getElementById("video");
+const downloadVideoButton = document.getElementById("downloadVideoButton");
+const resolutionInfo = document.getElementById("resolutionInfo");
+const historyList = document.getElementById("historyList");
+const HISTORY_DB_NAME="minimax-h3-video-history";
+const HISTORY_STORE_NAME="videos";
+let currentVideoObjectUrl=null;
+const historyObjectUrls=new Set();
+function openHistoryDB() { return new Promise((resolve,reject)=>{ const request=indexedDB.open(HISTORY_DB_NAME,1); request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(HISTORY_STORE_NAME))db.createObjectStore(HISTORY_STORE_NAME,{keyPath:"id"});}; request.onsuccess=()=>resolve(request.result); request.onerror=()=>reject(request.error||new Error("履歴データベースを開けませんでした。")); }); }
+async function saveHistoryItem(item) { const db=await openHistoryDB(); try { await new Promise((resolve,reject)=>{const tx=db.transaction(HISTORY_STORE_NAME,"readwrite");tx.objectStore(HISTORY_STORE_NAME).put(item);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error("履歴を保存できませんでした。"));tx.onabort=()=>reject(tx.error||new Error("履歴の保存が中断されました。"));});} finally {db.close();} }
+async function getHistoryItems() { const db=await openHistoryDB(); try {return await new Promise((resolve,reject)=>{const tx=db.transaction(HISTORY_STORE_NAME,"readonly");const request=tx.objectStore(HISTORY_STORE_NAME).getAll();request.onsuccess=()=>resolve(request.result.sort((a,b)=>b.createdAt-a.createdAt));request.onerror=()=>reject(request.error||new Error("履歴を読み込めませんでした。"));});} finally {db.close();} }
+async function getHistoryItem(id) { const db=await openHistoryDB(); try {return await new Promise((resolve,reject)=>{const request=db.transaction(HISTORY_STORE_NAME,"readonly").objectStore(HISTORY_STORE_NAME).get(id);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error("動画を読み込めませんでした。"));});} finally {db.close();} }
+async function deleteHistoryItem(id) { const db=await openHistoryDB(); try {await new Promise((resolve,reject)=>{const tx=db.transaction(HISTORY_STORE_NAME,"readwrite");tx.objectStore(HISTORY_STORE_NAME).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error("履歴を削除できませんでした。"));tx.onabort=()=>reject(tx.error||new Error("履歴の削除が中断されました。"));});} finally {db.close();} }
+function formatHistoryDate(timestamp){return new Date(timestamp).toLocaleString("ja-JP");}
+async function playHistoryItem(id) {
+  const saved=await getHistoryItem(id); if(!saved) throw new Error("履歴の動画が見つかりません。");
+  if(currentVideoObjectUrl)URL.revokeObjectURL(currentVideoObjectUrl); currentVideoObjectUrl=URL.createObjectURL(saved.blob); videoElement.src=currentVideoObjectUrl; videoElement.style.display="block"; downloadVideoButton.href=currentVideoObjectUrl; downloadVideoButton.download=saved.filename; downloadVideoButton.style.display="block"; videoElement.scrollIntoView({behavior:"smooth",block:"start"}); setStatus("履歴から動画を読み込みました。","success");
+}
+async function renderHistory() {
+  try {
+    const items=await getHistoryItems(); historyObjectUrls.forEach(url=>URL.revokeObjectURL(url)); historyObjectUrls.clear(); historyList.replaceChildren();
+    if(!items.length){const empty=document.createElement("p");empty.className="history-empty";empty.textContent="まだ履歴はありません。動画を生成すると、ここに保存されます。";historyList.appendChild(empty);return;}
+    for(const item of items){
+      const card=document.createElement("div");card.className="history-item";
+      const thumbnailUrl=URL.createObjectURL(item.blob);historyObjectUrls.add(thumbnailUrl);
+      const thumbnail=document.createElement("video");thumbnail.className="history-thumbnail";thumbnail.src=thumbnailUrl;thumbnail.muted=true;thumbnail.playsInline=true;thumbnail.preload="metadata";thumbnail.title="タップして再生";
+      thumbnail.addEventListener("loadedmetadata",()=>{try{thumbnail.currentTime=Math.min(0.1,Math.max(0,(thumbnail.duration||0)-0.01));}catch(error){console.warn("Thumbnail seek failed:",error);}});
+      thumbnail.addEventListener("click",async()=>{try{await playHistoryItem(item.id);}catch(error){setStatus(`履歴の再生に失敗しました：${error.message}`,"error");}});
+      const content=document.createElement("div");content.className="history-content";
+      const heading=document.createElement("strong");heading.className="history-prompt";heading.textContent=item.prompt||"プロンプトなし";
+      const meta=document.createElement("div");meta.className="history-meta";meta.textContent=`${formatHistoryDate(item.createdAt)}\n${item.mode==="image"?"画像 → 動画":"テキスト → 動画"}・${item.duration}秒・${item.width} × ${item.height}`;
+      const actions=document.createElement("div");actions.className="history-actions";
+      const playButton=document.createElement("button");playButton.type="button";playButton.textContent="再生";playButton.addEventListener("click",async()=>{try{await playHistoryItem(item.id);}catch(error){setStatus(`履歴の再生に失敗しました：${error.message}`,"error");}});
+      const saveButton=document.createElement("button");saveButton.type="button";saveButton.textContent="保存";saveButton.addEventListener("click",async()=>{try{const saved=await getHistoryItem(item.id);if(!saved)throw new Error("履歴の動画が見つかりません。");const url=URL.createObjectURL(saved.blob);historyObjectUrls.add(url);const link=document.createElement("a");link.href=url;link.download=saved.filename;link.click();setTimeout(()=>{URL.revokeObjectURL(url);historyObjectUrls.delete(url);},60000);}catch(error){setStatus(`動画の保存に失敗しました：${error.message}`,"error");}});
+      const deleteButton=document.createElement("button");deleteButton.type="button";deleteButton.textContent="削除";deleteButton.addEventListener("click",async()=>{if(!confirm("この動画を履歴から削除しますか？"))return;try{await deleteHistoryItem(item.id);await renderHistory();setStatus("履歴から動画を削除しました。","success");}catch(error){setStatus(`履歴の削除に失敗しました：${error.message}`,"error");}});
+      actions.append(playButton,saveButton,deleteButton);content.append(heading,meta,actions);card.append(thumbnail,content);historyList.appendChild(card);
     }
+  } catch(error) { historyList.textContent="履歴を利用できませんでした。このブラウザがサイト内データの保存を許可しているか確認してください。";console.error("History error:",error); }
+}
+async function storeGeneratedVideo(dataUrl,details){const response=await fetch(dataUrl);const blob=await response.blob();const createdAt=Date.now();const filename=`minimax-h3-${details.mode}-${details.duration}s-${new Date(createdAt).toISOString().replace(/[:.]/g,"-")}.mp4`;await saveHistoryItem({id:`${createdAt}-${Math.random().toString(36).slice(2)}`,createdAt,filename,blob,mode:details.mode,duration:details.duration,prompt:details.prompt,width:details.width,height:details.height});await renderHistory();}
 
-    imageModeTab.addEventListener("click", () => setMode("image"));
-    textModeTab.addEventListener("click", () => setMode("text"));
+let originalImage=null,naturalWidth=0,naturalHeight=0;
+function setStatus(message,type=""){statusElement.textContent=message;statusElement.className=type;}
+function updateGenerateButton(){const hasPrompt=promptInput.value.trim().length>0;if(currentMode==="image")generateButton.disabled=!originalImage||!hasPrompt;else generateButton.disabled=!hasPrompt;}
+function updateModeUI(){const isImageMode=currentMode==="image";imageSection.style.display=isImageMode?"block":"none";if(!isImageMode)resolutionInfo.style.display="none";else if(originalImage)updateResolutionInfo();promptInput.placeholder=isImageMode?"画像からどのような動画にしたいか入力してください":"生成したい動画の場面や動きを入力してください";updateGenerateButton();}
+promptInput.addEventListener("input",updateGenerateButton);
+function calculateH3Resolution(){const BASE_SHORT_EDGE=768,MAX_PIXELS=768*1344,STEP=32;if(!naturalWidth||!naturalHeight)return{width:768,height:768};const aspectRatio=naturalWidth/naturalHeight;let width,height;if(aspectRatio>=1){height=BASE_SHORT_EDGE;width=height*aspectRatio;}else{width=BASE_SHORT_EDGE;height=width/aspectRatio;}if(width*height>MAX_PIXELS){const scale=Math.sqrt(MAX_PIXELS/(width*height));width*=scale;height*=scale;}width=Math.max(STEP,Math.round(width/STEP)*STEP);height=Math.max(STEP,Math.round(height/STEP)*STEP);while(width*height>MAX_PIXELS){if(width>=height)width-=STEP;else height-=STEP;}return{width,height};}
+async function prepareImageForH3(){if(!originalImage)throw new Error("画像が選択されていません。");const resolution=calculateH3Resolution();const canvas=document.createElement("canvas");canvas.width=resolution.width;canvas.height=resolution.height;const ctx=canvas.getContext("2d");if(!ctx)throw new Error("Canvasを取得できませんでした。");ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(originalImage,0,0,resolution.width,resolution.height);return{dataUrl:canvas.toDataURL("image/jpeg",0.92),width:resolution.width,height:resolution.height};}
+function updateResolutionInfo(){if(!naturalWidth||!naturalHeight||currentMode!=="image"){resolutionInfo.style.display="none";return;}const resolution=calculateH3Resolution();const originalRatio=naturalWidth/naturalHeight;const outputRatio=resolution.width/resolution.height;resolutionInfo.textContent=`元画像: ${naturalWidth} × ${naturalHeight}\n元画像比率: ${originalRatio.toFixed(4)}\nH3生成解像度: ${resolution.width} × ${resolution.height}\n生成比率: ${outputRatio.toFixed(4)}`;resolutionInfo.style.display="block";}
+imageInput.addEventListener("change",()=>{const file=imageInput.files?.[0];if(!file){originalImage=null;naturalWidth=0;naturalHeight=0;preview.style.display="none";preview.removeAttribute("src");resolutionInfo.style.display="none";updateGenerateButton();return;}if(!file.type.startsWith("image/")){originalImage=null;preview.style.display="none";resolutionInfo.style.display="none";updateGenerateButton();setStatus("画像ファイルを選択してください。","error");return;}const reader=new FileReader();reader.onload=()=>{const image=new Image();image.onload=()=>{originalImage=image;naturalWidth=image.naturalWidth;naturalHeight=image.naturalHeight;preview.src=reader.result;preview.style.display="block";updateResolutionInfo();updateGenerateButton();setStatus("");};image.onerror=()=>{originalImage=null;naturalWidth=0;naturalHeight=0;updateGenerateButton();setStatus("画像の読み込みに失敗しました。","error");};image.src=reader.result;};reader.onerror=()=>{originalImage=null;naturalWidth=0;naturalHeight=0;updateGenerateButton();setStatus("画像ファイルの読み込みに失敗しました。","error");};reader.readAsDataURL(file);});
 
-    const durationSelect =
-      document.getElementById("durationSelect");
-
-    const loraControls = [
-      {
-        name: "hmnsfw",
-        checkbox: document.getElementById("loraHmnsfw"),
-        strength: document.getElementById("strengthHmnsfw"),
-        value: document.getElementById("strengthHmnsfwValue")
-      },
-      {
-        name: "free_pussy",
-        checkbox: document.getElementById("loraFreePussy"),
-        strength: document.getElementById("strengthFreePussy"),
-        value: document.getElementById("strengthFreePussyValue")
-      },
-      {
-        name: "hmpenis",
-        checkbox: document.getElementById("loraHmpenis"),
-        strength: document.getElementById("strengthHmpenis"),
-        value: document.getElementById("strengthHmpenisValue")
+generateButton.addEventListener("click",async()=>{
+  const mode=currentMode,duration=Number(durationSelect.value),prompt=promptInput.value.trim(),selectedLoras=getSelectedLoras();
+  if(!prompt){setStatus("プロンプトを入力してください。","error");return;}
+  savePromptHistory(prompt);
+  if(mode==="image"&&!originalImage){setStatus("画像を選択してください。","error");return;}
+  generateButton.disabled=true;
+  const controlsToLock=[imageModeTab,textModeTab,durationSelect,imageInput,promptInput,...loraControls.flatMap(c=>[c.checkbox,c.strength])];controlsToLock.forEach(c=>{c.disabled=true;});
+  videoElement.pause();videoElement.style.display="none";videoElement.removeAttribute("src");videoElement.load();downloadVideoButton.style.display="none";downloadVideoButton.removeAttribute("href");
+  try{
+    let imageData=null,width=768,height=768;
+    if(mode==="image"){setStatus("画像をH3用の解像度に変換しています...");const prepared=await prepareImageForH3();imageData=prepared.dataUrl;width=prepared.width;height=prepared.height;}
+    setStatus("動画生成を開始しています。\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さ: ${duration}秒\n`+`生成解像度: ${width} × ${height}`);
+    const requestBody={mode,duration,prompt,width,height,loras:selectedLoras};if(mode==="image")requestBody.image=imageData;
+    const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(requestBody)});const responseText=await response.text();let data;try{data=JSON.parse(responseText);}catch{throw new Error("サーバーからJSONではないレスポンスが返りました。\n"+`HTTP ${response.status}\n`+responseText.slice(0,500));}
+    if(!response.ok)throw new Error(data.error||"動画生成ジョブの登録に失敗しました。");if(!data.job_id)throw new Error("RunPodのjob IDを取得できませんでした。");const jobId=data.job_id;
+    setStatus("動画生成中です。\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さ: ${duration}秒\n`+`解像度: ${width} × ${height}\n`+`Job ID: ${jobId}`);
+    const MAX_ATTEMPTS=180;let completed=false;
+    for(let attempt=0;attempt<MAX_ATTEMPTS;attempt++){
+      await new Promise(resolve=>setTimeout(resolve,5000));
+      const statusResponse=await fetch(`/api/status?job_id=${encodeURIComponent(jobId)}`);const statusText=await statusResponse.text();let statusData;try{statusData=JSON.parse(statusText);}catch{throw new Error("ステータスAPIからJSONではないレスポンスが返りました。\n"+`HTTP ${statusResponse.status}\n`+statusText.slice(0,500));}
+      if(!statusResponse.ok)throw new Error(statusData.error||"ステータス取得に失敗しました。");console.log("RunPod status:",statusData);
+      if(statusData.status==="COMPLETED"){
+        completed=true;const outputs=statusData.output?.outputs;if(!outputs||!outputs.length)throw new Error("生成完了しましたが、動画データが見つかりません。");const output=outputs[0];let videoBase64=output.video||output.data||output;if(typeof videoBase64!=="string")throw new Error("動画データの形式を認識できません。");videoElement.src=videoBase64.startsWith("data:")?videoBase64:`data:video/mp4;base64,${videoBase64}`;videoElement.style.display="block";downloadVideoButton.href=videoElement.src;downloadVideoButton.download=`minimax-h3-${mode}-${duration}s-${new Date().toISOString().replace(/[:.]/g,"-")}.mp4`;downloadVideoButton.style.display="block";
+        let historySaveWarning="";try{await storeGeneratedVideo(videoElement.src,{mode,duration,prompt,width,height});}catch(historyError){console.error("Could not save video history:",historyError);historySaveWarning="\n\n注意：履歴への保存に失敗しました。動画は上のボタンから保存できます。";}
+        setStatus("動画生成が完了しました。"+historySaveWarning+"\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さの設定: ${duration}秒\n`+`生成解像度: ${width} × ${height}`,"success");break;
       }
-    ];
-
-    function getSelectedLoras() {
-      return loraControls
-        .filter(control => control.checkbox.checked)
-        .map(control => ({
-          name: control.name,
-          strength: Number(control.strength.value)
-        }));
+      if(statusData.status==="FAILED"||statusData.status==="CANCELLED")throw new Error(statusData.error||statusData.output?.error||`RunPodジョブが${statusData.status}になりました。`);
+      setStatus("動画生成中です。\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さの設定: ${duration}秒\n`+`解像度: ${width} × ${height}\n`+`状態: ${statusData.status}\n`+`確認: ${attempt+1} / ${MAX_ATTEMPTS}`);
     }
-
-    for (const control of loraControls) {
-      control.strength.addEventListener("input", () => {
-        control.value.textContent =
-          Number(control.strength.value).toFixed(2);
-      });
-    }
-
-    const imageSection =
-      document.getElementById("imageSection");
-
-    const imageInput =
-      document.getElementById("imageInput");
-
-    const preview =
-      document.getElementById("preview");
-
-    const promptInput =
-      document.getElementById("prompt");
-
-    const promptHistoryList =
-      document.getElementById("promptHistoryList");
-
-    const PROMPT_HISTORY_KEY = "minimax-h3-prompt-history";
-    const PROMPT_HISTORY_LIMIT = 5;
-
-    function readPromptHistory() {
-      try {
-        const saved = JSON.parse(localStorage.getItem(PROMPT_HISTORY_KEY) || "[]");
-        return Array.isArray(saved)
-          ? saved.filter(item => typeof item === "string" && item.trim()).slice(0, PROMPT_HISTORY_LIMIT)
-          : [];
-      } catch (error) {
-        console.warn("Prompt history could not be read:", error);
-        return [];
-      }
-    }
-
-    function savePromptHistory(prompt) {
-      const normalizedPrompt = prompt.trim();
-      if (!normalizedPrompt) return;
-      const history = readPromptHistory().filter(item => item !== normalizedPrompt);
-      history.unshift(normalizedPrompt);
-      try {
-        localStorage.setItem(
-          PROMPT_HISTORY_KEY,
-          JSON.stringify(history.slice(0, PROMPT_HISTORY_LIMIT))
-        );
-        renderPromptHistory();
-      } catch (error) {
-        console.warn("Prompt history could not be saved:", error);
-        setStatus("プロンプト履歴を保存できませんでした。ブラウザの保存領域を確認してください。", "error");
-      }
-    }
-
-    function renderPromptHistory() {
-      promptHistoryList.replaceChildren();
-      const history = readPromptHistory();
-      if (!history.length) {
-        const empty = document.createElement("p");
-        empty.className = "history-empty";
-        empty.textContent = "まだ履歴はありません。";
-        promptHistoryList.appendChild(empty);
-        return;
-      }
-
-      history.forEach((savedPrompt, index) => {
-        const row = document.createElement("div");
-        row.className = "prompt-history-item";
-
-        const useButton = document.createElement("button");
-        useButton.type = "button";
-        useButton.className = "prompt-history-use";
-        useButton.textContent = savedPrompt;
-        useButton.title = "このプロンプトを入力欄に戻す";
-        useButton.addEventListener("click", () => {
-          promptInput.value = savedPrompt;
-          updateGenerateButton();
-          promptInput.focus();
-          promptInput.scrollIntoView({ behavior: "smooth", block: "center" });
-        });
-
-        const deleteButton = document.createElement("button");
-        deleteButton.type = "button";
-        deleteButton.className = "prompt-history-delete";
-        deleteButton.textContent = "削除";
-        deleteButton.setAttribute("aria-label", `プロンプト履歴 ${index + 1} 件目を削除`);
-        deleteButton.addEventListener("click", () => {
-          const nextHistory = readPromptHistory().filter((_, itemIndex) => itemIndex !== index);
-          try {
-            localStorage.setItem(PROMPT_HISTORY_KEY, JSON.stringify(nextHistory));
-            renderPromptHistory();
-          } catch (error) {
-            console.warn("Prompt history could not be updated:", error);
-          }
-        });
-
-        row.append(useButton, deleteButton);
-        promptHistoryList.appendChild(row);
-      });
-    }
-
-    const generateButton =
-      document.getElementById("generateButton");
-
-    const statusElement =
-      document.getElementById("status");
-
-    const videoElement =
-      document.getElementById("video");
-
-    const downloadVideoButton =
-      document.getElementById("downloadVideoButton");
-
-    const resolutionInfo =
-      document.getElementById("resolutionInfo");
-
-    const historyList = document.getElementById("historyList");
-    const HISTORY_DB_NAME = "minimax-h3-video-history";
-    const HISTORY_STORE_NAME = "videos";
-    let currentVideoObjectUrl = null;
-    const historyObjectUrls = new Set();
-
-    function openHistoryDB() {
-      return new Promise((resolve, reject) => {
-        const request = indexedDB.open(HISTORY_DB_NAME, 1);
-        request.onupgradeneeded = () => {
-          const db = request.result;
-          if (!db.objectStoreNames.contains(HISTORY_STORE_NAME)) {
-            db.createObjectStore(HISTORY_STORE_NAME, { keyPath: "id" });
-          }
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error || new Error("履歴データベースを開けませんでした。"));
-      });
-    }
-
-    async function saveHistoryItem(item) {
-      const db = await openHistoryDB();
-      try {
-        await new Promise((resolve, reject) => {
-          const tx = db.transaction(HISTORY_STORE_NAME, "readwrite");
-          tx.objectStore(HISTORY_STORE_NAME).put(item);
-          tx.oncomplete = resolve;
-          tx.onerror = () => reject(tx.error || new Error("履歴を保存できませんでした。"));
-          tx.onabort = () => reject(tx.error || new Error("履歴の保存が中断されました。"));
-        });
-      } finally {
-        db.close();
-      }
-    }
-
-    async function getHistoryItems() {
-      const db = await openHistoryDB();
-      try {
-        return await new Promise((resolve, reject) => {
-          const tx = db.transaction(HISTORY_STORE_NAME, "readonly");
-          const request = tx.objectStore(HISTORY_STORE_NAME).getAll();
-          request.onsuccess = () => resolve(request.result.sort((a, b) => b.createdAt - a.createdAt));
-          request.onerror = () => reject(request.error || new Error("履歴を読み込めませんでした。"));
-        });
-      } finally {
-        db.close();
-      }
-    }
-
-    async function getHistoryItem(id) {
-      const db = await openHistoryDB();
-      try {
-        return await new Promise((resolve, reject) => {
-          const request = db.transaction(HISTORY_STORE_NAME, "readonly").objectStore(HISTORY_STORE_NAME).get(id);
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error || new Error("動画を読み込めませんでした。"));
-        });
-      } finally {
-        db.close();
-      }
-    }
-
-    async function deleteHistoryItem(id) {
-      const db = await openHistoryDB();
-      try {
-        await new Promise((resolve, reject) => {
-          const tx = db.transaction(HISTORY_STORE_NAME, "readwrite");
-          tx.objectStore(HISTORY_STORE_NAME).delete(id);
-          tx.oncomplete = resolve;
-          tx.onerror = () => reject(tx.error || new Error("履歴を削除できませんでした。"));
-          tx.onabort = () => reject(tx.error || new Error("履歴の削除が中断されました。"));
-        });
-      } finally {
-        db.close();
-      }
-    }
-
-    function formatHistoryDate(timestamp) {
-      return new Date(timestamp).toLocaleString("ja-JP");
-    }
-
-    async function renderHistory() {
-      try {
-        const items = await getHistoryItems();
-        historyObjectUrls.forEach(url => URL.revokeObjectURL(url));
-        historyObjectUrls.clear();
-        historyList.replaceChildren();
-
-        if (!items.length) {
-          const empty = document.createElement("p");
-          empty.className = "history-empty";
-          empty.textContent = "まだ履歴はありません。動画を生成すると、ここに保存されます。";
-          historyList.appendChild(empty);
-          return;
-        }
-
-        for (const item of items) {
-          const card = document.createElement("div");
-          card.className = "history-item";
-
-          const heading = document.createElement("strong");
-          heading.textContent = item.prompt || "プロンプトなし";
-
-          const meta = document.createElement("div");
-          meta.className = "history-meta";
-          meta.textContent =
-            `${formatHistoryDate(item.createdAt)}\n` +
-            `${item.mode === "image" ? "画像 → 動画" : "テキスト → 動画"}・${item.duration}秒・${item.width} × ${item.height}`;
-
-          const actions = document.createElement("div");
-          actions.className = "history-actions";
-
-          const playButton = document.createElement("button");
-          playButton.type = "button";
-          playButton.textContent = "再生";
-          playButton.addEventListener("click", async () => {
-            try {
-              const saved = await getHistoryItem(item.id);
-              if (!saved) throw new Error("履歴の動画が見つかりません。");
-              if (currentVideoObjectUrl) URL.revokeObjectURL(currentVideoObjectUrl);
-              currentVideoObjectUrl = URL.createObjectURL(saved.blob);
-              videoElement.src = currentVideoObjectUrl;
-              videoElement.style.display = "block";
-              downloadVideoButton.href = currentVideoObjectUrl;
-              downloadVideoButton.download = saved.filename;
-              downloadVideoButton.style.display = "block";
-              videoElement.scrollIntoView({ behavior: "smooth", block: "start" });
-              setStatus("履歴から動画を読み込みました。", "success");
-            } catch (error) {
-              setStatus(`履歴の再生に失敗しました：${error.message}`, "error");
-            }
-          });
-
-          const saveButton = document.createElement("button");
-          saveButton.type = "button";
-          saveButton.textContent = "保存";
-          saveButton.addEventListener("click", async () => {
-            try {
-              const saved = await getHistoryItem(item.id);
-              if (!saved) throw new Error("履歴の動画が見つかりません。");
-              const url = URL.createObjectURL(saved.blob);
-              historyObjectUrls.add(url);
-              const link = document.createElement("a");
-              link.href = url;
-              link.download = saved.filename;
-              link.click();
-              setTimeout(() => {
-                URL.revokeObjectURL(url);
-                historyObjectUrls.delete(url);
-              }, 60000);
-            } catch (error) {
-              setStatus(`動画の保存に失敗しました：${error.message}`, "error");
-            }
-          });
-
-          const deleteButton = document.createElement("button");
-          deleteButton.type = "button";
-          deleteButton.textContent = "削除";
-          deleteButton.addEventListener("click", async () => {
-            if (!confirm("この動画を履歴から削除しますか？")) return;
-            try {
-              await deleteHistoryItem(item.id);
-              await renderHistory();
-              setStatus("履歴から動画を削除しました。", "success");
-            } catch (error) {
-              setStatus(`履歴の削除に失敗しました：${error.message}`, "error");
-            }
-          });
-
-          actions.append(playButton, saveButton, deleteButton);
-          card.append(heading, meta, actions);
-          historyList.appendChild(card);
-        }
-      } catch (error) {
-        historyList.textContent = "履歴を利用できませんでした。このブラウザがサイト内データの保存を許可しているか確認してください。";
-        console.error("History error:", error);
-      }
-    }
-
-    async function storeGeneratedVideo(dataUrl, details) {
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
-      const createdAt = Date.now();
-      const filename = `minimax-h3-${details.mode}-${details.duration}s-${new Date(createdAt).toISOString().replace(/[:.]/g, "-")}.mp4`;
-      await saveHistoryItem({
-        id: `${createdAt}-${Math.random().toString(36).slice(2)}`,
-        createdAt,
-        filename,
-        blob,
-        mode: details.mode,
-        duration: details.duration,
-        prompt: details.prompt,
-        width: details.width,
-        height: details.height
-      });
-      await renderHistory();
-    }
-
-
-    // =========================================================
-    // Image state
-    // =========================================================
-
-    let originalImage = null;
-    let naturalWidth = 0;
-    let naturalHeight = 0;
-
-
-    // =========================================================
-    // Status helper
-    // =========================================================
-
-    function setStatus(message, type = "") {
-      statusElement.textContent = message;
-      statusElement.className = type;
-    }
-
-
-    // =========================================================
-    // Update button state
-    // =========================================================
-
-    function updateGenerateButton() {
-      const mode = currentMode;
-      const hasPrompt = promptInput.value.trim().length > 0;
-
-      if (mode === "image") {
-        generateButton.disabled =
-          !originalImage || !hasPrompt;
-      } else {
-        generateButton.disabled = !hasPrompt;
-      }
-    }
-
-
-    // =========================================================
-    // Update visible controls for selected mode
-    // =========================================================
-
-    function updateModeUI() {
-      const mode = currentMode;
-      const isImageMode = mode === "image";
-
-      imageSection.style.display =
-        isImageMode ? "block" : "none";
-
-      if (!isImageMode) {
-        resolutionInfo.style.display = "none";
-      } else if (originalImage) {
-        updateResolutionInfo();
-      }
-
-      promptInput.placeholder = isImageMode
-        ? "画像からどのような動画にしたいか入力してください"
-        : "生成したい動画の場面や動きを入力してください";
-
-      updateGenerateButton();
-    }
-
-    promptInput.addEventListener("input", () => {
-      updateGenerateButton();
-    });
-
-
-    // =========================================================
-    // Calculate H3 resolution
-    //
-    // Short edge: 768
-    // Maximum area: 768 x 1344
-    // Multiple: 32
-    // =========================================================
-
-    function calculateH3Resolution() {
-      const BASE_SHORT_EDGE = 768;
-      const MAX_PIXELS = 768 * 1344;
-      const STEP = 32;
-
-      if (!naturalWidth || !naturalHeight) {
-        return {
-          width: 768,
-          height: 768
-        };
-      }
-
-      const aspectRatio =
-        naturalWidth / naturalHeight;
-
-      let width;
-      let height;
-
-      // 元画像の縦横比を維持
-      if (aspectRatio >= 1.0) {
-        height = BASE_SHORT_EDGE;
-        width = height * aspectRatio;
-      } else {
-        width = BASE_SHORT_EDGE;
-        height = width / aspectRatio;
-      }
-
-      // 最大キャンバス面積に収める
-      if (width * height > MAX_PIXELS) {
-        const scale = Math.sqrt(
-          MAX_PIXELS / (width * height)
-        );
-
-        width *= scale;
-        height *= scale;
-      }
-
-      // 32の倍数に丸める
-      width = Math.max(
-        STEP,
-        Math.round(width / STEP) * STEP
-      );
-
-      height = Math.max(
-        STEP,
-        Math.round(height / STEP) * STEP
-      );
-
-      // 丸め処理後の面積を再確認
-      while (width * height > MAX_PIXELS) {
-        if (width >= height) {
-          width -= STEP;
-        } else {
-          height -= STEP;
-        }
-      }
-
-      console.log(
-        "Original image:",
-        naturalWidth,
-        "x",
-        naturalHeight
-      );
-
-      console.log(
-        "H3 resolution:",
-        width,
-        "x",
-        height
-      );
-
-      return {
-        width,
-        height
-      };
-    }
-
-
-    // =========================================================
-    // Prepare image for H3
-    // =========================================================
-
-    async function prepareImageForH3() {
-      if (!originalImage) {
-        throw new Error("画像が選択されていません。");
-      }
-
-      const resolution = calculateH3Resolution();
-
-      const canvas = document.createElement("canvas");
-
-      canvas.width = resolution.width;
-      canvas.height = resolution.height;
-
-      const ctx = canvas.getContext("2d");
-
-      if (!ctx) {
-        throw new Error("Canvasを取得できませんでした。");
-      }
-
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-
-      ctx.drawImage(
-        originalImage,
-        0,
-        0,
-        resolution.width,
-        resolution.height
-      );
-
-      const dataUrl = canvas.toDataURL(
-        "image/jpeg",
-        0.92
-      );
-
-      console.log(
-        "Prepared image:",
-        resolution.width,
-        "x",
-        resolution.height
-      );
-
-      return {
-        dataUrl,
-        width: resolution.width,
-        height: resolution.height
-      };
-    }
-
-
-    // =========================================================
-    // Update resolution information
-    // =========================================================
-
-    function updateResolutionInfo() {
-      if (
-        !naturalWidth ||
-        !naturalHeight ||
-        currentMode !== "image"
-      ) {
-        resolutionInfo.style.display = "none";
-        return;
-      }
-
-      const resolution = calculateH3Resolution();
-
-      const originalRatio =
-        naturalWidth / naturalHeight;
-
-      const outputRatio =
-        resolution.width / resolution.height;
-
-      resolutionInfo.textContent =
-        `元画像: ${naturalWidth} × ${naturalHeight}` +
-        `\n元画像比率: ${originalRatio.toFixed(4)}` +
-        `\nH3生成解像度: ${resolution.width} × ${resolution.height}` +
-        `\n生成比率: ${outputRatio.toFixed(4)}`;
-
-      resolutionInfo.style.display = "block";
-    }
-
-
-    // =========================================================
-    // Image selection
-    // =========================================================
-
-    imageInput.addEventListener("change", () => {
-      const file = imageInput.files?.[0];
-
-      if (!file) {
-        originalImage = null;
-        naturalWidth = 0;
-        naturalHeight = 0;
-
-        preview.style.display = "none";
-        preview.removeAttribute("src");
-
-        resolutionInfo.style.display = "none";
-
-        updateGenerateButton();
-        return;
-      }
-
-      if (!file.type.startsWith("image/")) {
-        originalImage = null;
-
-        preview.style.display = "none";
-        resolutionInfo.style.display = "none";
-
-        updateGenerateButton();
-
-        setStatus(
-          "画像ファイルを選択してください。",
-          "error"
-        );
-
-        return;
-      }
-
-      const reader = new FileReader();
-
-      reader.onload = () => {
-        const image = new Image();
-
-        image.onload = () => {
-          originalImage = image;
-          naturalWidth = image.naturalWidth;
-          naturalHeight = image.naturalHeight;
-
-          preview.src = reader.result;
-          preview.style.display = "block";
-
-          updateResolutionInfo();
-          updateGenerateButton();
-
-          setStatus("");
-        };
-
-        image.onerror = () => {
-          originalImage = null;
-          naturalWidth = 0;
-          naturalHeight = 0;
-
-          updateGenerateButton();
-
-          setStatus(
-            "画像の読み込みに失敗しました。",
-            "error"
-          );
-        };
-
-        image.src = reader.result;
-      };
-
-      reader.onerror = () => {
-        originalImage = null;
-        naturalWidth = 0;
-        naturalHeight = 0;
-
-        updateGenerateButton();
-
-        setStatus(
-          "画像ファイルの読み込みに失敗しました。",
-          "error"
-        );
-      };
-
-      reader.readAsDataURL(file);
-    });
-
-
-    // =========================================================
-    // Generate video
-    // =========================================================
-
-    generateButton.addEventListener("click", async () => {
-      // Capture every setting at click time so later UI changes cannot
-      // alter the payload while image preparation is awaiting completion.
-      const mode = currentMode;
-      const duration = Number(durationSelect.value);
-      const prompt = promptInput.value.trim();
-      const selectedLoras = getSelectedLoras();
-
-      if (!prompt) {
-        setStatus(
-          "プロンプトを入力してください。",
-          "error"
-        );
-        return;
-      }
-
-      savePromptHistory(prompt);
-
-      if (mode === "image" && !originalImage) {
-        setStatus(
-          "画像を選択してください。",
-          "error"
-        );
-        return;
-      }
-
-      generateButton.disabled = true;
-      const controlsToLock = [
-        imageModeTab, textModeTab, durationSelect, imageInput, promptInput,
-        ...loraControls.flatMap(control => [control.checkbox, control.strength])
-      ];
-      controlsToLock.forEach(control => { control.disabled = true; });
-
-      videoElement.pause();
-      videoElement.style.display = "none";
-      videoElement.removeAttribute("src");
-      videoElement.load();
-      downloadVideoButton.style.display = "none";
-      downloadVideoButton.removeAttribute("href");
-
-      try {
-        let imageData = null;
-        let width = 768;
-        let height = 768;
-
-        // -----------------------------------------------
-        // Image mode: prepare image
-        // -----------------------------------------------
-
-        if (mode === "image") {
-          setStatus(
-            "画像をH3用の解像度に変換しています..."
-          );
-
-          const prepared = await prepareImageForH3();
-
-          imageData = prepared.dataUrl;
-          width = prepared.width;
-          height = prepared.height;
-        }
-
-        // -----------------------------------------------
-        // Submit generation job
-        // -----------------------------------------------
-
-        setStatus(
-          "動画生成を開始しています。\n" +
-          `モード: ${
-            mode === "image"
-              ? "画像 → 動画"
-              : "テキスト → 動画"
-          }\n` +
-          `長さ: ${duration}秒\n` +
-          `生成解像度: ${width} × ${height}`
-        );
-
-        const requestBody = {
-          mode,
-          duration,
-          prompt,
-          width,
-          height,
-          loras: selectedLoras
-        };
-
-        // 画像モードだけ画像データを送る
-        if (mode === "image") {
-          requestBody.image = imageData;
-        }
-
-        const response = await fetch("/api/generate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(requestBody)
-        });
-
-        const responseText = await response.text();
-
-        let data;
-
-        try {
-          data = JSON.parse(responseText);
-        } catch {
-          throw new Error(
-            "サーバーからJSONではないレスポンスが返りました。\n" +
-            `HTTP ${response.status}\n` +
-            responseText.slice(0, 500)
-          );
-        }
-
-        if (!response.ok) {
-          throw new Error(
-            data.error ||
-            "動画生成ジョブの登録に失敗しました。"
-          );
-        }
-
-        if (!data.job_id) {
-          throw new Error(
-            "RunPodのjob IDを取得できませんでした。"
-          );
-        }
-
-        const jobId = data.job_id;
-
-        setStatus(
-          "動画生成中です。\n" +
-          `モード: ${
-            mode === "image"
-              ? "画像 → 動画"
-              : "テキスト → 動画"
-          }\n` +
-          `長さ: ${duration}秒\n` +
-          `解像度: ${width} × ${height}\n` +
-          `Job ID: ${jobId}`
-        );
-
-        // -----------------------------------------------
-        // Poll status
-        // -----------------------------------------------
-
-        const MAX_ATTEMPTS = 180;
-        let completed = false;
-
-        for (
-          let attempt = 0;
-          attempt < MAX_ATTEMPTS;
-          attempt++
-        ) {
-          await new Promise(resolve => {
-            setTimeout(resolve, 5000);
-          });
-
-          const statusResponse = await fetch(
-            `/api/status?job_id=${encodeURIComponent(jobId)}`
-          );
-
-          const statusText = await statusResponse.text();
-
-          let statusData;
-
-          try {
-            statusData = JSON.parse(statusText);
-          } catch {
-            throw new Error(
-              "ステータスAPIからJSONではないレスポンスが返りました。\n" +
-              `HTTP ${statusResponse.status}\n` +
-              statusText.slice(0, 500)
-            );
-          }
-
-          if (!statusResponse.ok) {
-            throw new Error(
-              statusData.error ||
-              "ステータス取得に失敗しました。"
-            );
-          }
-
-          console.log("RunPod status:", statusData);
-
-          // ---------------------------------------------
-          // Completed
-          // ---------------------------------------------
-
-          if (statusData.status === "COMPLETED") {
-            completed = true;
-
-            const outputs =
-              statusData.output?.outputs;
-
-            if (!outputs || !outputs.length) {
-              throw new Error(
-                "生成完了しましたが、動画データが見つかりません。"
-              );
-            }
-
-            const output = outputs[0];
-
-            let videoBase64 =
-              output.video ||
-              output.data ||
-              output;
-
-            if (typeof videoBase64 !== "string") {
-              throw new Error(
-                "動画データの形式を認識できません。"
-              );
-            }
-
-            if (videoBase64.startsWith("data:")) {
-              videoElement.src = videoBase64;
-            } else {
-              videoElement.src =
-                `data:video/mp4;base64,${videoBase64}`;
-            }
-
-            videoElement.style.display = "block";
-            downloadVideoButton.href = videoElement.src;
-            downloadVideoButton.download =
-              `minimax-h3-${mode}-${duration}s-${new Date().toISOString().replace(/[:.]/g, "-")}.mp4`;
-            downloadVideoButton.style.display = "block";
-
-            let historySaveWarning = "";
-            try {
-              await storeGeneratedVideo(videoElement.src, {
-                mode,
-                duration,
-                prompt,
-                width,
-                height
-              });
-            } catch (historyError) {
-              console.error("Could not save video history:", historyError);
-              historySaveWarning =
-                "\n\n注意：履歴への保存に失敗しました。動画は上のボタンから保存できます。";
-            }
-
-            setStatus(
-              "動画生成が完了しました。" + historySaveWarning + "\n" +
-              `モード: ${
-                mode === "image"
-                  ? "画像 → 動画"
-                  : "テキスト → 動画"
-              }\n` +
-              `長さの設定: ${duration}秒\n` +
-              `生成解像度: ${width} × ${height}`,
-              "success"
-            );
-
-            break;
-          }
-
-          // ---------------------------------------------
-          // Failed
-          // ---------------------------------------------
-
-          if (
-            statusData.status === "FAILED" ||
-            statusData.status === "CANCELLED"
-          ) {
-            throw new Error(
-              statusData.error ||
-              statusData.output?.error ||
-              `RunPodジョブが${statusData.status}になりました。`
-            );
-          }
-
-          // ---------------------------------------------
-          // Still running
-          // ---------------------------------------------
-
-          setStatus(
-            "動画生成中です。\n" +
-            `モード: ${
-              mode === "image"
-                ? "画像 → 動画"
-                : "テキスト → 動画"
-            }\n` +
-            `長さの設定: ${duration}秒\n` +
-            `解像度: ${width} × ${height}\n` +
-            `状態: ${statusData.status}\n` +
-            `確認: ${attempt + 1} / ${MAX_ATTEMPTS}`
-          );
-        }
-
-        if (!completed) {
-          throw new Error(
-            "動画生成が15分以内に完了しませんでした。"
-          );
-        }
-
-      } catch (error) {
-        console.error("Generation error:", error);
-
-        setStatus(
-          `エラー:\n${error.message}`,
-          "error"
-        );
-
-      } finally {
-        controlsToLock.forEach(control => { control.disabled = false; });
-        updateModeUI();
-        updateGenerateButton();
-      }
-    });
-
-
-    // =========================================================
-    // Initial UI
-    // =========================================================
-
-    updateModeUI();
-    updateGenerateButton();
-    renderHistory();
-    renderPromptHistory();
-
-  </script>
-
+    if(!completed)throw new Error("動画生成が15分以内に完了しませんでした。");
+  }catch(error){console.error("Generation error:",error);setStatus(`エラー:\n${error.message}`,"error");}
+  finally{controlsToLock.forEach(c=>{c.disabled=false;});updateModeUI();updateGenerateButton();}
+});
+
+updateModeUI();updateGenerateButton();renderHistory();renderPromptHistory();
+</script>
 </body>
 </html>
