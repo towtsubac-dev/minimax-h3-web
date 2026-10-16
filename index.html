@@ -1180,6 +1180,7 @@
               `minimax-h3-${mode}-${duration}s-${new Date().toISOString().replace(/[:.]/g, "-")}.mp4`;
             downloadVideoButton.style.display = "block";
 
+            let historySaveWarning = "";
             try {
               await storeGeneratedVideo(videoElement.src, {
                 mode,
@@ -1190,15 +1191,12 @@
               });
             } catch (historyError) {
               console.error("Could not save video history:", historyError);
-              setStatus(
-                "動画生成は完了しましたが、履歴への保存に失敗しました。動画は上のボタンから保存できます。\n" +
-                historyError.message,
-                "error"
-              );
+              historySaveWarning =
+                "\n\n注意：履歴への保存に失敗しました。動画は上のボタンから保存できます。";
             }
 
             setStatus(
-              "動画生成が完了しました。\n" +
+              "動画生成が完了しました。" + historySaveWarning + "\n" +
               `モード: ${
                 mode === "image"
                   ? "画像 → 動画"
