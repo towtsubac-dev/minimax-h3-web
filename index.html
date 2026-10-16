@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>MiniMax H3 Image to Video</title>
+  <title>MiniMax H3 動画生成</title>
 
   <style>
     body {
@@ -12,6 +12,7 @@
       max-width: 800px;
       margin: 0 auto;
       padding: 20px;
+      line-height: 1.6;
     }
 
     h1 {
@@ -29,18 +30,26 @@
     }
 
     input[type="file"],
-    textarea {
+    textarea,
+    select {
       width: 100%;
       box-sizing: border-box;
+      font-size: 16px;
     }
 
-    textarea {
-      min-height: 100px;
+    select {
       padding: 10px;
     }
 
+    textarea {
+      min-height: 120px;
+      padding: 10px;
+      resize: vertical;
+    }
+
     button {
-      padding: 12px 24px;
+      width: 100%;
+      padding: 14px 24px;
       font-size: 16px;
       cursor: pointer;
     }
@@ -77,6 +86,7 @@
       border-radius: 6px;
       font-size: 14px;
       white-space: pre-wrap;
+      word-break: break-word;
     }
 
     .error {
@@ -91,13 +101,34 @@
 
 <body>
 
-  <h1>MiniMax H3 Image to Video</h1>
+  <h1>MiniMax H3 動画生成</h1>
 
+  <!-- 生成モード -->
   <div class="section">
+    <label for="modeSelect">生成モード</label>
 
-    <label for="imageInput">
-      画像
-    </label>
+    <select id="modeSelect">
+      <option value="image">画像 → 動画</option>
+      <option value="text">テキスト → 動画</option>
+    </select>
+  </div>
+
+  <!-- 動画の長さ -->
+  <div class="section">
+    <label for="durationSelect">動画の長さ</label>
+
+    <select id="durationSelect">
+      <option value="3">3秒</option>
+      <option value="5" selected>5秒</option>
+      <option value="8">8秒</option>
+      <option value="10">10秒</option>
+    </select>
+  </div>
+
+  <!-- 画像選択 -->
+  <div class="section" id="imageSection">
+
+    <label for="imageInput">画像</label>
 
     <input
       type="file"
@@ -107,7 +138,7 @@
 
     <img
       id="preview"
-      alt="Preview"
+      alt="選択した画像のプレビュー"
     >
 
     <div
@@ -118,47 +149,53 @@
 
   </div>
 
-
+  <!-- プロンプト -->
   <div class="section">
 
-    <label for="prompt">
-      プロンプト
-    </label>
+    <label for="prompt">プロンプト</label>
 
     <textarea
       id="prompt"
-      placeholder="動画にしたい動きを入力してください"
+      placeholder="動画にしたい動きや場面を入力してください"
     ></textarea>
 
   </div>
 
-
+  <!-- 生成ボタン -->
   <div class="section">
 
     <button
       id="generateButton"
       disabled
     >
-      動画生成
+      動画を生成
     </button>
 
   </div>
 
+  <!-- 状態表示 -->
+  <div id="status" role="status" aria-live="polite"></div>
 
-  <div id="status"></div>
-
-
+  <!-- 生成動画 -->
   <video
     id="video"
     controls
+    playsinline
   ></video>
 
-
   <script>
-
     // =========================================================
     // Elements
     // =========================================================
+
+    const modeSelect =
+      document.getElementById("modeSelect");
+
+    const durationSelect =
+      document.getElementById("durationSelect");
+
+    const imageSection =
+      document.getElementById("imageSection");
 
     const imageInput =
       document.getElementById("imageInput");
@@ -187,9 +224,7 @@
     // =========================================================
 
     let originalImage = null;
-
     let naturalWidth = 0;
-
     let naturalHeight = 0;
 
 
@@ -197,17 +232,61 @@
     // Status helper
     // =========================================================
 
-    function setStatus(
-      message,
-      type = ""
-    ) {
-
-      statusElement.textContent =
-        message;
-
-      statusElement.className =
-        type;
+    function setStatus(message, type = "") {
+      statusElement.textContent = message;
+      statusElement.className = type;
     }
+
+
+    // =========================================================
+    // Update button state
+    // =========================================================
+
+    function updateGenerateButton() {
+      const mode = modeSelect.value;
+      const hasPrompt = promptInput.value.trim().length > 0;
+
+      if (mode === "image") {
+        generateButton.disabled =
+          !originalImage || !hasPrompt;
+      } else {
+        generateButton.disabled = !hasPrompt;
+      }
+    }
+
+
+    // =========================================================
+    // Update visible controls for selected mode
+    // =========================================================
+
+    function updateModeUI() {
+      const mode = modeSelect.value;
+      const isImageMode = mode === "image";
+
+      imageSection.style.display =
+        isImageMode ? "block" : "none";
+
+      if (!isImageMode) {
+        resolutionInfo.style.display = "none";
+      } else if (originalImage) {
+        updateResolutionInfo();
+      }
+
+      promptInput.placeholder = isImageMode
+        ? "画像からどのような動画にしたいか入力してください"
+        : "生成したい動画の場面や動きを入力してください";
+
+      updateGenerateButton();
+    }
+
+    modeSelect.addEventListener("change", () => {
+      updateModeUI();
+      setStatus("");
+    });
+
+    promptInput.addEventListener("input", () => {
+      updateGenerateButton();
+    });
 
 
     // =========================================================
@@ -219,124 +298,61 @@
     // =========================================================
 
     function calculateH3Resolution() {
-
       const BASE_SHORT_EDGE = 768;
-
-      const MAX_PIXELS =
-        768 * 1344;
-
+      const MAX_PIXELS = 768 * 1344;
       const STEP = 32;
 
-
-      if (
-        !naturalWidth ||
-        !naturalHeight
-      ) {
-
+      if (!naturalWidth || !naturalHeight) {
         return {
           width: 768,
           height: 768
         };
       }
 
-
       const aspectRatio =
-        naturalWidth /
-        naturalHeight;
-
+        naturalWidth / naturalHeight;
 
       let width;
-
       let height;
 
-
-      // -------------------------------------------------------
-      // Preserve original aspect ratio
-      // -------------------------------------------------------
-
+      // 元画像の縦横比を維持
       if (aspectRatio >= 1.0) {
-
-        // Landscape
-
-        height =
-          BASE_SHORT_EDGE;
-
-        width =
-          height * aspectRatio;
-
+        height = BASE_SHORT_EDGE;
+        width = height * aspectRatio;
       } else {
-
-        // Portrait
-
-        width =
-          BASE_SHORT_EDGE;
-
-        height =
-          width / aspectRatio;
+        width = BASE_SHORT_EDGE;
+        height = width / aspectRatio;
       }
 
-
-      // -------------------------------------------------------
-      // Maximum canvas area
-      // -------------------------------------------------------
-
-      if (
-        width * height >
-        MAX_PIXELS
-      ) {
-
-        const scale =
-          Math.sqrt(
-            MAX_PIXELS /
-            (width * height)
-          );
+      // 最大キャンバス面積に収める
+      if (width * height > MAX_PIXELS) {
+        const scale = Math.sqrt(
+          MAX_PIXELS / (width * height)
+        );
 
         width *= scale;
-
         height *= scale;
       }
 
+      // 32の倍数に丸める
+      width = Math.max(
+        STEP,
+        Math.round(width / STEP) * STEP
+      );
 
-      // -------------------------------------------------------
-      // Round to 32px
-      // -------------------------------------------------------
+      height = Math.max(
+        STEP,
+        Math.round(height / STEP) * STEP
+      );
 
-      width =
-        Math.max(
-          STEP,
-          Math.round(
-            width / STEP
-          ) * STEP
-        );
-
-      height =
-        Math.max(
-          STEP,
-          Math.round(
-            height / STEP
-          ) * STEP
-        );
-
-
-      // -------------------------------------------------------
-      // Final maximum-area safety
-      // -------------------------------------------------------
-
-      while (
-        width * height >
-        MAX_PIXELS
-      ) {
-
+      // 丸め処理後の面積を再確認
+      while (width * height > MAX_PIXELS) {
         if (width >= height) {
-
           width -= STEP;
-
         } else {
-
           height -= STEP;
         }
       }
-
 
       console.log(
         "Original image:",
@@ -346,17 +362,11 @@
       );
 
       console.log(
-        "Original aspect ratio:",
-        aspectRatio
-      );
-
-      console.log(
         "H3 resolution:",
         width,
         "x",
         height
       );
-
 
       return {
         width,
@@ -367,56 +377,28 @@
 
     // =========================================================
     // Prepare image for H3
-    //
-    // Large original image is resized in the browser first.
-    // Only the resized JPEG is sent to Vercel.
     // =========================================================
 
     async function prepareImageForH3() {
-
       if (!originalImage) {
-
-        throw new Error(
-          "画像が選択されていません。"
-        );
+        throw new Error("画像が選択されていません。");
       }
 
+      const resolution = calculateH3Resolution();
 
-      const resolution =
-        calculateH3Resolution();
+      const canvas = document.createElement("canvas");
 
+      canvas.width = resolution.width;
+      canvas.height = resolution.height;
 
-      const canvas =
-        document.createElement(
-          "canvas"
-        );
-
-
-      canvas.width =
-        resolution.width;
-
-      canvas.height =
-        resolution.height;
-
-
-      const ctx =
-        canvas.getContext("2d");
-
+      const ctx = canvas.getContext("2d");
 
       if (!ctx) {
-
-        throw new Error(
-          "Canvasを取得できませんでした。"
-        );
+        throw new Error("Canvasを取得できませんでした。");
       }
 
-
-      ctx.imageSmoothingEnabled =
-        true;
-
-      ctx.imageSmoothingQuality =
-        "high";
-
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
 
       ctx.drawImage(
         originalImage,
@@ -426,37 +408,17 @@
         resolution.height
       );
 
-
-      // -------------------------------------------------------
-      // Convert to JPEG
-      // -------------------------------------------------------
-
-      const dataUrl =
-        canvas.toDataURL(
-          "image/jpeg",
-          0.92
-        );
-
-
-      console.log(
-        "Original image pixels:",
-        naturalWidth,
-        "x",
-        naturalHeight
+      const dataUrl = canvas.toDataURL(
+        "image/jpeg",
+        0.92
       );
 
       console.log(
-        "H3 image pixels:",
+        "Prepared image:",
         resolution.width,
         "x",
         resolution.height
       );
-
-      console.log(
-        "Prepared image Base64 length:",
-        dataUrl.length
-      );
-
 
       return {
         dataUrl,
@@ -471,32 +433,22 @@
     // =========================================================
 
     function updateResolutionInfo() {
-
       if (
         !naturalWidth ||
-        !naturalHeight
+        !naturalHeight ||
+        modeSelect.value !== "image"
       ) {
-
-        resolutionInfo.style.display =
-          "none";
-
+        resolutionInfo.style.display = "none";
         return;
       }
 
-
-      const resolution =
-        calculateH3Resolution();
-
+      const resolution = calculateH3Resolution();
 
       const originalRatio =
-        naturalWidth /
-        naturalHeight;
-
+        naturalWidth / naturalHeight;
 
       const outputRatio =
-        resolution.width /
-        resolution.height;
-
+        resolution.width / resolution.height;
 
       resolutionInfo.textContent =
         `元画像: ${naturalWidth} × ${naturalHeight}` +
@@ -504,9 +456,7 @@
         `\nH3生成解像度: ${resolution.width} × ${resolution.height}` +
         `\n生成比率: ${outputRatio.toFixed(4)}`;
 
-
-      resolutionInfo.style.display =
-        "block";
+      resolutionInfo.style.display = "block";
     }
 
 
@@ -514,476 +464,376 @@
     // Image selection
     // =========================================================
 
-    imageInput.addEventListener(
-      "change",
-      () => {
+    imageInput.addEventListener("change", () => {
+      const file = imageInput.files?.[0];
 
-        const file =
-          imageInput.files?.[0];
+      if (!file) {
+        originalImage = null;
+        naturalWidth = 0;
+        naturalHeight = 0;
 
+        preview.style.display = "none";
+        preview.removeAttribute("src");
 
-        if (!file) {
+        resolutionInfo.style.display = "none";
 
-          originalImage = null;
+        updateGenerateButton();
+        return;
+      }
 
-          naturalWidth = 0;
+      if (!file.type.startsWith("image/")) {
+        originalImage = null;
 
-          naturalHeight = 0;
+        preview.style.display = "none";
+        resolutionInfo.style.display = "none";
 
-          preview.style.display =
-            "none";
+        updateGenerateButton();
 
-          resolutionInfo.style.display =
-            "none";
+        setStatus(
+          "画像ファイルを選択してください。",
+          "error"
+        );
 
-          generateButton.disabled =
-            true;
+        return;
+      }
 
-          return;
-        }
+      const reader = new FileReader();
 
+      reader.onload = () => {
+        const image = new Image();
 
-        const reader =
-          new FileReader();
+        image.onload = () => {
+          originalImage = image;
+          naturalWidth = image.naturalWidth;
+          naturalHeight = image.naturalHeight;
 
+          preview.src = reader.result;
+          preview.style.display = "block";
 
-        reader.onload = () => {
+          updateResolutionInfo();
+          updateGenerateButton();
 
-          const image =
-            new Image();
-
-
-          image.onload = () => {
-
-            originalImage =
-              image;
-
-            naturalWidth =
-              image.naturalWidth;
-
-            naturalHeight =
-              image.naturalHeight;
-
-
-            preview.src =
-              reader.result;
-
-            preview.style.display =
-              "block";
-
-
-            updateResolutionInfo();
-
-
-            generateButton.disabled =
-              false;
-
-
-            setStatus("");
-          };
-
-
-          image.onerror = () => {
-
-            originalImage = null;
-
-            generateButton.disabled =
-              true;
-
-            setStatus(
-              "画像の読み込みに失敗しました。",
-              "error"
-            );
-          };
-
-
-          image.src =
-            reader.result;
+          setStatus("");
         };
 
-
-        reader.onerror = () => {
-
+        image.onerror = () => {
           originalImage = null;
+          naturalWidth = 0;
+          naturalHeight = 0;
 
-          generateButton.disabled =
-            true;
+          updateGenerateButton();
 
           setStatus(
-            "画像ファイルの読み込みに失敗しました。",
+            "画像の読み込みに失敗しました。",
             "error"
           );
         };
 
+        image.src = reader.result;
+      };
 
-        reader.readAsDataURL(file);
-      }
-    );
+      reader.onerror = () => {
+        originalImage = null;
+        naturalWidth = 0;
+        naturalHeight = 0;
+
+        updateGenerateButton();
+
+        setStatus(
+          "画像ファイルの読み込みに失敗しました。",
+          "error"
+        );
+      };
+
+      reader.readAsDataURL(file);
+    });
 
 
     // =========================================================
     // Generate video
     // =========================================================
 
-    generateButton.addEventListener(
-      "click",
-      async () => {
+    generateButton.addEventListener("click", async () => {
+      const mode = modeSelect.value;
+      const duration = Number(durationSelect.value);
+      const prompt = promptInput.value.trim();
 
-        if (!originalImage) {
-
-          setStatus(
-            "画像を選択してください。",
-            "error"
-          );
-
-          return;
-        }
-
-
-        generateButton.disabled =
-          true;
-
-
-        videoElement.style.display =
-          "none";
-
-        videoElement.removeAttribute(
-          "src"
+      if (!prompt) {
+        setStatus(
+          "プロンプトを入力してください。",
+          "error"
         );
+        return;
+      }
 
+      if (mode === "image" && !originalImage) {
+        setStatus(
+          "画像を選択してください。",
+          "error"
+        );
+        return;
+      }
 
-        try {
+      generateButton.disabled = true;
 
-          // ---------------------------------------------------
-          // Resize image
-          // ---------------------------------------------------
+      videoElement.pause();
+      videoElement.style.display = "none";
+      videoElement.removeAttribute("src");
+      videoElement.load();
 
+      try {
+        let imageData = null;
+        let width = 768;
+        let height = 768;
+
+        // -----------------------------------------------
+        // Image mode: prepare image
+        // -----------------------------------------------
+
+        if (mode === "image") {
           setStatus(
             "画像をH3用の解像度に変換しています..."
           );
 
+          const prepared = await prepareImageForH3();
 
-          const prepared =
-            await prepareImageForH3();
+          imageData = prepared.dataUrl;
+          width = prepared.width;
+          height = prepared.height;
+        }
 
+        // -----------------------------------------------
+        // Submit generation job
+        // -----------------------------------------------
 
-          console.log(
-            "Prepared H3 image:",
-            prepared.width,
-            "x",
-            prepared.height
+        setStatus(
+          "動画生成を開始しています。\n" +
+          `モード: ${
+            mode === "image"
+              ? "画像 → 動画"
+              : "テキスト → 動画"
+          }\n` +
+          `長さ: ${duration}秒\n` +
+          `生成解像度: ${width} × ${height}`
+        );
+
+        const requestBody = {
+          mode,
+          duration,
+          prompt,
+          width,
+          height
+        };
+
+        // 画像モードだけ画像データを送る
+        if (mode === "image") {
+          requestBody.image = imageData;
+        }
+
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        const responseText = await response.text();
+
+        let data;
+
+        try {
+          data = JSON.parse(responseText);
+        } catch {
+          throw new Error(
+            "サーバーからJSONではないレスポンスが返りました。\n" +
+            `HTTP ${response.status}\n` +
+            responseText.slice(0, 500)
+          );
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+            "動画生成ジョブの登録に失敗しました。"
+          );
+        }
+
+        if (!data.job_id) {
+          throw new Error(
+            "RunPodのjob IDを取得できませんでした。"
+          );
+        }
+
+        const jobId = data.job_id;
+
+        setStatus(
+          "動画生成中です。\n" +
+          `モード: ${
+            mode === "image"
+              ? "画像 → 動画"
+              : "テキスト → 動画"
+          }\n` +
+          `長さ: ${duration}秒\n` +
+          `解像度: ${width} × ${height}\n` +
+          `Job ID: ${jobId}`
+        );
+
+        // -----------------------------------------------
+        // Poll status
+        // -----------------------------------------------
+
+        const MAX_ATTEMPTS = 180;
+        let completed = false;
+
+        for (
+          let attempt = 0;
+          attempt < MAX_ATTEMPTS;
+          attempt++
+        ) {
+          await new Promise(resolve => {
+            setTimeout(resolve, 5000);
+          });
+
+          const statusResponse = await fetch(
+            `/api/status?job_id=${encodeURIComponent(jobId)}`
           );
 
+          const statusText = await statusResponse.text();
 
-          // ---------------------------------------------------
-          // Submit job
-          // ---------------------------------------------------
-
-          setStatus(
-            `動画生成を開始しています。\n` +
-            `生成解像度: ${prepared.width} × ${prepared.height}`
-          );
-
-
-          const response =
-            await fetch(
-              "/api/generate",
-              {
-                method: "POST",
-
-                headers: {
-                  "Content-Type":
-                    "application/json"
-                },
-
-                body:
-                  JSON.stringify({
-                    image:
-                      prepared.dataUrl,
-
-                    prompt:
-                      promptInput.value || "",
-
-                    width:
-                      prepared.width,
-
-                    height:
-                      prepared.height
-                  })
-              }
-            );
-
-
-          // ---------------------------------------------------
-          // Read response safely
-          // ---------------------------------------------------
-
-          const responseText =
-            await response.text();
-
-
-          let data;
-
+          let statusData;
 
           try {
-
-            data =
-              JSON.parse(
-                responseText
-              );
-
+            statusData = JSON.parse(statusText);
           } catch {
-
             throw new Error(
-              `サーバーからJSONではないレスポンスが返りました。\n` +
-              `HTTP ${response.status}\n` +
-              responseText.slice(0, 500)
+              "ステータスAPIからJSONではないレスポンスが返りました。\n" +
+              `HTTP ${statusResponse.status}\n` +
+              statusText.slice(0, 500)
             );
           }
 
-
-          if (!response.ok) {
-
+          if (!statusResponse.ok) {
             throw new Error(
-              data.error ||
-              "動画生成ジョブの登録に失敗しました。"
+              statusData.error ||
+              "ステータス取得に失敗しました。"
             );
           }
 
+          console.log("RunPod status:", statusData);
 
-          if (!data.job_id) {
+          // ---------------------------------------------
+          // Completed
+          // ---------------------------------------------
 
-            throw new Error(
-              "RunPodのjob IDを取得できませんでした。"
-            );
-          }
+          if (statusData.status === "COMPLETED") {
+            completed = true;
 
+            const outputs =
+              statusData.output?.outputs;
 
-          const jobId =
-            data.job_id;
-
-
-          setStatus(
-            `動画生成中です。\n` +
-            `解像度: ${prepared.width} × ${prepared.height}\n` +
-            `Job ID: ${jobId}`
-          );
-
-
-          // ---------------------------------------------------
-          // Poll status
-          // ---------------------------------------------------
-
-          const MAX_ATTEMPTS =
-            180;
-
-          let completed =
-            false;
-
-
-          for (
-            let attempt = 0;
-            attempt < MAX_ATTEMPTS;
-            attempt++
-          ) {
-
-            await new Promise(
-              resolve =>
-                setTimeout(
-                  resolve,
-                  5000
-                )
-            );
-
-
-            const statusResponse =
-              await fetch(
-                `/api/status?job_id=${encodeURIComponent(jobId)}`
-              );
-
-
-            const statusText =
-              await statusResponse.text();
-
-
-            let statusData;
-
-
-            try {
-
-              statusData =
-                JSON.parse(
-                  statusText
-                );
-
-            } catch {
-
+            if (!outputs || !outputs.length) {
               throw new Error(
-                `ステータスAPIからJSONではないレスポンスが返りました。\n` +
-                `HTTP ${statusResponse.status}\n` +
-                statusText.slice(0, 500)
+                "生成完了しましたが、動画データが見つかりません。"
               );
             }
 
+            const output = outputs[0];
 
-            if (!statusResponse.ok) {
+            let videoBase64 =
+              output.video ||
+              output.data ||
+              output;
 
+            if (typeof videoBase64 !== "string") {
               throw new Error(
-                statusData.error ||
-                "ステータス取得に失敗しました。"
+                "動画データの形式を認識できません。"
               );
             }
 
-
-            console.log(
-              "RunPod status:",
-              statusData
-            );
-
-
-            // -------------------------------------------------
-            // Completed
-            // -------------------------------------------------
-
-            if (
-              statusData.status ===
-              "COMPLETED"
-            ) {
-
-              completed =
-                true;
-
-
-              const outputs =
-                statusData
-                  .output
-                  ?.outputs;
-
-
-              if (
-                !outputs ||
-                !outputs.length
-              ) {
-
-                throw new Error(
-                  "生成完了しましたが、動画データが見つかりません。"
-                );
-              }
-
-
-              const output =
-                outputs[0];
-
-
-              let videoBase64 =
-                output.video ||
-                output.data ||
-                output;
-
-
-              if (
-                typeof videoBase64 !==
-                "string"
-              ) {
-
-                throw new Error(
-                  "動画データの形式を認識できません。"
-                );
-              }
-
-
-              if (
-                videoBase64.startsWith(
-                  "data:"
-                )
-              ) {
-
-                videoElement.src =
-                  videoBase64;
-
-              } else {
-
-                videoElement.src =
-                  `data:video/mp4;base64,${videoBase64}`;
-              }
-
-
-              videoElement.style.display =
-                "block";
-
-
-              setStatus(
-                `動画生成が完了しました。\n` +
-                `H3解像度: ${prepared.width} × ${prepared.height}`,
-                "success"
-              );
-
-
-              break;
+            if (videoBase64.startsWith("data:")) {
+              videoElement.src = videoBase64;
+            } else {
+              videoElement.src =
+                `data:video/mp4;base64,${videoBase64}`;
             }
 
-
-            // -------------------------------------------------
-            // Failed
-            // -------------------------------------------------
-
-            if (
-              statusData.status ===
-                "FAILED" ||
-              statusData.status ===
-                "CANCELLED"
-            ) {
-
-              throw new Error(
-                statusData.error ||
-                statusData.output?.error ||
-                `RunPodジョブが${statusData.status}になりました。`
-              );
-            }
-
-
-            // -------------------------------------------------
-            // Still running
-            // -------------------------------------------------
+            videoElement.style.display = "block";
 
             setStatus(
-              `動画生成中です。\n` +
-              `H3解像度: ${prepared.width} × ${prepared.height}\n` +
-              `状態: ${statusData.status}\n` +
-              `確認: ${attempt + 1} / ${MAX_ATTEMPTS}`
+              "動画生成が完了しました。\n" +
+              `モード: ${
+                mode === "image"
+                  ? "画像 → 動画"
+                  : "テキスト → 動画"
+              }\n` +
+              `長さの設定: ${duration}秒\n` +
+              `生成解像度: ${width} × ${height}`,
+              "success"
             );
+
+            break;
           }
 
+          // ---------------------------------------------
+          // Failed
+          // ---------------------------------------------
 
-          if (!completed) {
-
+          if (
+            statusData.status === "FAILED" ||
+            statusData.status === "CANCELLED"
+          ) {
             throw new Error(
-              "動画生成が15分以内に完了しませんでした。"
+              statusData.error ||
+              statusData.output?.error ||
+              `RunPodジョブが${statusData.status}になりました。`
             );
           }
 
-
-        } catch (error) {
-
-          console.error(
-            "Generation error:",
-            error
-          );
-
+          // ---------------------------------------------
+          // Still running
+          // ---------------------------------------------
 
           setStatus(
-            `エラー:\n${error.message}`,
-            "error"
+            "動画生成中です。\n" +
+            `モード: ${
+              mode === "image"
+                ? "画像 → 動画"
+                : "テキスト → 動画"
+            }\n` +
+            `長さの設定: ${duration}秒\n` +
+            `解像度: ${width} × ${height}\n` +
+            `状態: ${statusData.status}\n` +
+            `確認: ${attempt + 1} / ${MAX_ATTEMPTS}`
           );
-
-
-        } finally {
-
-          generateButton.disabled =
-            false;
         }
+
+        if (!completed) {
+          throw new Error(
+            "動画生成が15分以内に完了しませんでした。"
+          );
+        }
+
+      } catch (error) {
+        console.error("Generation error:", error);
+
+        setStatus(
+          `エラー:\n${error.message}`,
+          "error"
+        );
+
+      } finally {
+        updateGenerateButton();
       }
-    );
+    });
+
+
+    // =========================================================
+    // Initial UI
+    // =========================================================
+
+    updateModeUI();
+    updateGenerateButton();
 
   </script>
 
