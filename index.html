@@ -204,13 +204,12 @@ async function renderHistory() {
       thumbnail.addEventListener("loadedmetadata",()=>{try{thumbnail.currentTime=Math.min(0.1,Math.max(0,(thumbnail.duration||0)-0.01));}catch(error){console.warn("Thumbnail seek failed:",error);}});
       thumbnail.addEventListener("click",async()=>{try{await playHistoryItem(item.id);}catch(error){setStatus(`履歴の再生に失敗しました：${error.message}`,"error");}});
       const content=document.createElement("div");content.className="history-content";
-      const heading=document.createElement("strong");heading.className="history-prompt";heading.textContent=item.prompt||"プロンプトなし";
       const meta=document.createElement("div");meta.className="history-meta";meta.textContent=`${formatHistoryDate(item.createdAt)}\n${item.mode==="image"?"画像 → 動画":"テキスト → 動画"}・${item.duration}秒・${item.width} × ${item.height}`;
       const actions=document.createElement("div");actions.className="history-actions";
       const playButton=document.createElement("button");playButton.type="button";playButton.textContent="再生";playButton.addEventListener("click",async()=>{try{await playHistoryItem(item.id);}catch(error){setStatus(`履歴の再生に失敗しました：${error.message}`,"error");}});
       const saveButton=document.createElement("button");saveButton.type="button";saveButton.textContent="保存";saveButton.addEventListener("click",async()=>{try{const saved=await getHistoryItem(item.id);if(!saved)throw new Error("履歴の動画が見つかりません。");const url=URL.createObjectURL(saved.blob);historyObjectUrls.add(url);const link=document.createElement("a");link.href=url;link.download=saved.filename;link.click();setTimeout(()=>{URL.revokeObjectURL(url);historyObjectUrls.delete(url);},60000);}catch(error){setStatus(`動画の保存に失敗しました：${error.message}`,"error");}});
       const deleteButton=document.createElement("button");deleteButton.type="button";deleteButton.textContent="削除";deleteButton.addEventListener("click",async()=>{if(!confirm("この動画を履歴から削除しますか？"))return;try{await deleteHistoryItem(item.id);await renderHistory();setStatus("履歴から動画を削除しました。","success");}catch(error){setStatus(`履歴の削除に失敗しました：${error.message}`,"error");}});
-      actions.append(playButton,saveButton,deleteButton);content.append(heading,meta,actions);card.append(thumbnail,content);historyList.appendChild(card);
+      actions.append(playButton,saveButton,deleteButton);content.append(meta,actions);card.append(thumbnail,content);historyList.appendChild(card);
     }
   } catch(error) { historyList.textContent="履歴を利用できませんでした。このブラウザがサイト内データの保存を許可しているか確認してください。";console.error("History error:",error); }
 }
