@@ -100,6 +100,20 @@
       margin-top: 20px;
     }
 
+    .download-link {
+      display: none;
+      box-sizing: border-box;
+      margin-top: 12px;
+      padding: 14px 24px;
+      border-radius: 6px;
+      background: #222;
+      color: #fff;
+      text-align: center;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
     #status {
       margin-top: 15px;
       white-space: pre-wrap;
@@ -286,6 +300,13 @@
     playsinline
   ></video>
 
+  <a
+    id="downloadVideoButton"
+    class="download-link"
+    href="#"
+    download="minimax-h3-video.mp4"
+  >動画を保存</a>
+
   <script>
     // =========================================================
     // Elements
@@ -366,6 +387,9 @@
 
     const videoElement =
       document.getElementById("video");
+
+    const downloadVideoButton =
+      document.getElementById("downloadVideoButton");
 
     const resolutionInfo =
       document.getElementById("resolutionInfo");
@@ -735,6 +759,8 @@
       videoElement.style.display = "none";
       videoElement.removeAttribute("src");
       videoElement.load();
+      downloadVideoButton.style.display = "none";
+      downloadVideoButton.removeAttribute("href");
 
       try {
         let imageData = null;
@@ -915,6 +941,10 @@
             }
 
             videoElement.style.display = "block";
+            downloadVideoButton.href = videoElement.src;
+            downloadVideoButton.download =
+              `minimax-h3-${mode}-${duration}s-${new Date().toISOString().replace(/[:.]/g, "-")}.mp4`;
+            downloadVideoButton.style.display = "block";
 
             setStatus(
               "動画生成が完了しました。\n" +
