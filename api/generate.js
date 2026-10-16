@@ -14,7 +14,8 @@ export default async function handler(req, res) {
       width,
       height,
       mode = "image",
-      duration = 5
+      duration = 5,
+      lora = "none"
     } = req.body || {};
 
     // 秒数からH3のフレーム数へ変換
@@ -24,6 +25,12 @@ export default async function handler(req, res) {
       8: 196,
       10: 244
     };
+
+    if (!["none", "hmnsfw", "free_pussy", "hmpenis"].includes(lora)) {
+      return res.status(400).json({
+        error: "追加LoRAの指定が不正です。"
+      });
+    }
 
     if (!["image", "text"].includes(mode)) {
       return res.status(400).json({
@@ -120,7 +127,8 @@ export default async function handler(req, res) {
       height: safeHeight,
       length: durationLengths[String(duration)],
       steps: 8,
-      seed: Math.floor(Math.random() * 1000000000)
+      seed: Math.floor(Math.random() * 1000000000),
+      lora
     };
 
     // 画像モードの場合だけ画像を送信
