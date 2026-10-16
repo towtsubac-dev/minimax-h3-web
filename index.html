@@ -125,6 +125,21 @@
     </select>
   </div>
 
+  <!-- Optional LoRA -->
+  <div class="section">
+    <label for="loraSelect">追加LoRA（任意）</label>
+    <select id="loraSelect">
+      <option value="none" selected>使用しない（通常設定）</option>
+      <option value="hmnsfw">HMNSFW AIO V2.5（強度 0.7）</option>
+      <option value="free_pussy">Free Pussy（強度 1.0）</option>
+      <option value="hmpenis">HMPenis（強度 1.0）</option>
+    </select>
+    <div class="info">
+      選択したLoRAのトリガーワードはプロンプトの先頭に自動追加されます。
+      追加LoRAを選ばない場合は、これまでどおりTurbo LoRAのみを使用します。
+    </div>
+  </div>
+
   <!-- 画像選択 -->
   <div class="section" id="imageSection">
 
@@ -193,6 +208,9 @@
 
     const durationSelect =
       document.getElementById("durationSelect");
+
+    const loraSelect =
+      document.getElementById("loraSelect");
 
     const imageSection =
       document.getElementById("imageSection");
@@ -622,7 +640,8 @@
           duration,
           prompt,
           width,
-          height
+          height,
+          lora: loraSelect.value
         };
 
         // 画像モードだけ画像データを送る
