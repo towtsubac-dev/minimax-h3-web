@@ -114,6 +114,27 @@
       font-weight: 600;
     }
 
+    .prompt-history-item {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .prompt-history-use {
+      flex: 1;
+      min-width: 0;
+      text-align: left;
+      padding: 10px;
+      overflow-wrap: anywhere;
+    }
+
+    .prompt-history-delete {
+      width: auto;
+      flex: 0 0 auto;
+      padding: 10px 12px;
+    }
+
     .history-item {
       border: 1px solid #ccc;
       border-radius: 8px;
@@ -306,6 +327,12 @@
       placeholder="動画にしたい動きや場面を入力してください"
     ></textarea>
 
+    <div class="section" id="promptHistorySection">
+      <label>プロンプト履歴（最大5件）</label>
+      <div class="info">動画生成を開始するとプロンプトが自動保存されます。履歴をタップすると入力欄に戻せます。</div>
+      <div id="promptHistoryList"></div>
+    </div>
+
   </div>
 
   <!-- 生成ボタン -->
@@ -414,6 +441,88 @@
 
     const promptInput =
       document.getElementById("prompt");
+
+    const promptHistoryList =
+      document.getElementById("promptHistoryList");
+
+    const PROMPT_HISTORY_KEY = "minimax-h3-prompt-history";
+    const PROMPT_HISTORY_LIMIT = 5;
+
+    function readPromptHistory() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(PROMPT_HISTORY_KEY) || "[]");
+        return Array.isArray(saved)
+          ? saved.filter(item => typeof item === "string" && item.trim()).slice(0, PROMPT_HISTORY_LIMIT)
+          : [];
+      } catch (error) {
+        console.warn("Prompt history could not be read:", error);
+        return [];
+      }
+    }
+
+    function savePromptHistory(prompt) {
+      const normalizedPrompt = prompt.trim();
+      if (!normalizedPrompt) return;
+      const history = readPromptHistory().filter(item => item !== normalizedPrompt);
+      history.unshift(normalizedPrompt);
+      try {
+        localStorage.setItem(
+          PROMPT_HISTORY_KEY,
+          JSON.stringify(history.slice(0, PROMPT_HISTORY_LIMIT))
+        );
+        renderPromptHistory();
+      } catch (error) {
+        console.warn("Prompt history could not be saved:", error);
+        setStatus("プロンプト履歴を保存できませんでした。ブラウザの保存領域を確認してください。", "error");
+      }
+    }
+
+    function renderPromptHistory() {
+      promptHistoryList.replaceChildren();
+      const history = readPromptHistory();
+      if (!history.length) {
+        const empty = document.createElement("p");
+        empty.className = "history-empty";
+        empty.textContent = "まだ履歴はありません。";
+        promptHistoryList.appendChild(empty);
+        return;
+      }
+
+      history.forEach((savedPrompt, index) => {
+        const row = document.createElement("div");
+        row.className = "prompt-history-item";
+
+        const useButton = document.createElement("button");
+        useButton.type = "button";
+        useButton.className = "prompt-history-use";
+        useButton.textContent = savedPrompt;
+        useButton.title = "このプロンプトを入力欄に戻す";
+        useButton.addEventListener("click", () => {
+          promptInput.value = savedPrompt;
+          updateGenerateButton();
+          promptInput.focus();
+          promptInput.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "prompt-history-delete";
+        deleteButton.textContent = "削除";
+        deleteButton.setAttribute("aria-label", `プロンプト履歴 ${index + 1} 件目を削除`);
+        deleteButton.addEventListener("click", () => {
+          const nextHistory = readPromptHistory().filter((_, itemIndex) => itemIndex !== index);
+          try {
+            localStorage.setItem(PROMPT_HISTORY_KEY, JSON.stringify(nextHistory));
+            renderPromptHistory();
+          } catch (error) {
+            console.warn("Prompt history could not be updated:", error);
+          }
+        });
+
+        row.append(useButton, deleteButton);
+        promptHistoryList.appendChild(row);
+      });
+    }
 
     const generateButton =
       document.getElementById("generateButton");
@@ -974,6 +1083,8 @@
         return;
       }
 
+      savePromptHistory(prompt);
+
       if (mode === "image" && !originalImage) {
         setStatus(
           "画像を選択してください。",
@@ -1272,6 +1383,7 @@
     updateModeUI();
     updateGenerateButton();
     renderHistory();
+    renderPromptHistory();
 
   </script>
 
