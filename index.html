@@ -89,6 +89,36 @@
       word-break: break-word;
     }
 
+    .lora-option {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 12px;
+      margin: 10px 0;
+    }
+
+    .lora-check {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .lora-check input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+    }
+
+    .lora-strength label {
+      margin-bottom: 4px;
+      font-weight: normal;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
     .error {
       color: #c00;
     }
@@ -125,18 +155,47 @@
     </select>
   </div>
 
-  <!-- Optional LoRA -->
+  <!-- Optional LoRAs -->
   <div class="section">
-    <label for="loraSelect">追加LoRA（任意）</label>
-    <select id="loraSelect">
-      <option value="none" selected>使用しない（通常設定）</option>
-      <option value="hmnsfw">HMNSFW AIO V2.5（強度 0.7）</option>
-      <option value="free_pussy">Free Pussy（強度 1.0）</option>
-      <option value="hmpenis">HMPenis（強度 1.0）</option>
-    </select>
+    <label>追加LoRA（複数選択可）</label>
+
+    <div class="lora-option">
+      <label class="lora-check" for="loraHmnsfw">
+        <input type="checkbox" id="loraHmnsfw" value="hmnsfw">
+        HMNSFW AIO V2.5
+      </label>
+      <div class="lora-strength">
+        <label for="strengthHmnsfw">強度：<span id="strengthHmnsfwValue">0.70</span></label>
+        <input type="range" id="strengthHmnsfw" min="0" max="1.5" step="0.05" value="0.7">
+      </div>
+    </div>
+
+    <div class="lora-option">
+      <label class="lora-check" for="loraFreePussy">
+        <input type="checkbox" id="loraFreePussy" value="free_pussy">
+        Free Pussy
+      </label>
+      <div class="lora-strength">
+        <label for="strengthFreePussy">強度：<span id="strengthFreePussyValue">1.00</span></label>
+        <input type="range" id="strengthFreePussy" min="0" max="1.5" step="0.05" value="1.0">
+      </div>
+    </div>
+
+    <div class="lora-option">
+      <label class="lora-check" for="loraHmpenis">
+        <input type="checkbox" id="loraHmpenis" value="hmpenis">
+        HMPenis
+      </label>
+      <div class="lora-strength">
+        <label for="strengthHmpenis">強度：<span id="strengthHmpenisValue">1.00</span></label>
+        <input type="range" id="strengthHmpenis" min="0" max="1.5" step="0.05" value="1.0">
+      </div>
+    </div>
+
     <div class="info">
+      チェックしたLoRAをすべて同時に適用します。強度は各LoRAごとに0.00〜1.50で調整できます。
       選択したLoRAのトリガーワードはプロンプトの先頭に自動追加されます。
-      追加LoRAを選ばない場合は、これまでどおりTurbo LoRAのみを使用します。
+      何も選択しない場合は、これまでどおりTurbo LoRAのみを使用します。
     </div>
   </div>
 
@@ -209,8 +268,42 @@
     const durationSelect =
       document.getElementById("durationSelect");
 
-    const loraSelect =
-      document.getElementById("loraSelect");
+    const loraControls = [
+      {
+        name: "hmnsfw",
+        checkbox: document.getElementById("loraHmnsfw"),
+        strength: document.getElementById("strengthHmnsfw"),
+        value: document.getElementById("strengthHmnsfwValue")
+      },
+      {
+        name: "free_pussy",
+        checkbox: document.getElementById("loraFreePussy"),
+        strength: document.getElementById("strengthFreePussy"),
+        value: document.getElementById("strengthFreePussyValue")
+      },
+      {
+        name: "hmpenis",
+        checkbox: document.getElementById("loraHmpenis"),
+        strength: document.getElementById("strengthHmpenis"),
+        value: document.getElementById("strengthHmpenisValue")
+      }
+    ];
+
+    function getSelectedLoras() {
+      return loraControls
+        .filter(control => control.checkbox.checked)
+        .map(control => ({
+          name: control.name,
+          strength: Number(control.strength.value)
+        }));
+    }
+
+    for (const control of loraControls) {
+      control.strength.addEventListener("input", () => {
+        control.value.textContent =
+          Number(control.strength.value).toFixed(2);
+      });
+    }
 
     const imageSection =
       document.getElementById("imageSection");
@@ -641,7 +734,7 @@
           prompt,
           width,
           height,
-          lora: loraSelect.value
+          loras: getSelectedLoras()
         };
 
         // 画像モードだけ画像データを送る
