@@ -252,6 +252,26 @@ async function storeGeneratedVideo(dataUrl,details){const response=await fetch(d
 
 let originalImage=null,naturalWidth=0,naturalHeight=0;
 function setStatus(message,type=""){statusElement.textContent=message;statusElement.className=type;}
+const GPU_USD_PER_HOUR=1.10;
+const ESTIMATED_JPY_PER_USD=150;
+function formatSeconds(ms){const seconds=ms/1000;return seconds>=60?Math.floor(seconds/60)+"分"+(seconds%60).toFixed(2)+"秒":seconds.toFixed(2)+"秒";}
+function formatJobTiming(statusData){
+  const delay=statusData.delayTime,execution=statusData.executionTime;
+  const hasDelay=typeof delay==="number"&&Number.isFinite(delay)&&delay>=0;
+  const hasExecution=typeof execution==="number"&&Number.isFinite(execution)&&execution>=0;
+  const lines=["処理時間・料金（RunPod）"];
+  lines.push("待機時間: "+(hasDelay?formatSeconds(delay):"取得できませんでした"));
+  lines.push("実行時間: "+(hasExecution?formatSeconds(execution):"取得できませんでした"));
+  lines.push("合計時間: "+(hasDelay&&hasExecution?formatSeconds(delay+execution):"取得できませんでした"));
+  if(hasExecution){
+    const usd=execution/3600000*GPU_USD_PER_HOUR;
+    lines.push("GPU実行料金の概算: $"+usd.toFixed(4)+"（約"+(usd*ESTIMATED_JPY_PER_USD).toFixed(1)+"円）");
+    lines.push("※ GPU単価 $1.10/時、換算 1ドル=150円。Worker起動・アイドル時間等は含まないため、実際の請求額とは異なります。");
+  }else{
+    lines.push("GPU実行料金の概算: 算出できませんでした");
+  }
+  return "\n\n"+lines.join("\n");
+}
 function updateGenerateButton(){const hasPrompt=promptInput.value.trim().length>0;if(extendBusy||currentMode==="extend"){generateButton.disabled=true;return;}if(currentMode==="image")generateButton.disabled=!originalImage||!hasPrompt;else generateButton.disabled=!hasPrompt;}
 function updateModeUI(){const isExtend=currentMode==="extend",isImageMode=currentMode==="image";imageSection.style.display=isImageMode?"block":"none";for(const id of ["durationSection","promptSection","generateSection"])document.getElementById(id).style.display=isExtend?"none":"block";document.getElementById("loraSection").style.display="block";extendSection.style.display=isExtend?"block":"none";if(!isImageMode)resolutionInfo.style.display="none";else if(originalImage)updateResolutionInfo();promptInput.placeholder=isImageMode?"画像からどのような動画にしたいか入力してください":"生成したい動画の場面や動きを入力してください";updateGenerateButton();}
 promptInput.addEventListener("input",updateGenerateButton);
@@ -285,7 +305,7 @@ generateButton.addEventListener("click",async()=>{
       if(statusData.status==="COMPLETED"){
         completed=true;const outputs=statusData.output?.outputs;if(!outputs||!outputs.length)throw new Error("生成完了しましたが、動画データが見つかりません。");const output=outputs[0];let videoBase64=output.video||output.data||output;if(typeof videoBase64!=="string")throw new Error("動画データの形式を認識できません。");videoElement.src=videoBase64.startsWith("data:")?videoBase64:`data:video/mp4;base64,${videoBase64}`;videoElement.style.display="block";downloadVideoButton.href=videoElement.src;downloadVideoButton.download=`minimax-h3-${mode}-${duration}s-${new Date().toISOString().replace(/[:.]/g,"-")}.mp4`;downloadVideoButton.style.display="block";
         let historySaveWarning="";try{await storeGeneratedVideo(videoElement.src,{mode,duration,prompt,width,height});}catch(historyError){console.error("Could not save video history:",historyError);historySaveWarning="\n\n注意：履歴への保存に失敗しました。動画は上のボタンから保存できます。";}
-        setStatus("動画生成が完了しました。"+historySaveWarning+"\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さの設定: ${duration}秒\n`+`生成解像度: ${width} × ${height}`,"success");break;
+        setStatus("動画生成が完了しました。"+historySaveWarning+"\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さの設定: ${duration}秒\n`+`生成解像度: ${width} × ${height}`+formatJobTiming(statusData),"success");break;
       }
       if(statusData.status==="FAILED"||statusData.status==="CANCELLED")throw new Error(statusData.error||statusData.output?.error||`RunPodジョブが${statusData.status}になりました。`);
       setStatus("動画生成中です。\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さの設定: ${duration}秒\n`+`解像度: ${width} × ${height}\n`+`状態: ${statusData.status}\n`+`確認: ${attempt+1} / ${MAX_ATTEMPTS}`);
@@ -364,12 +384,12 @@ extendSubmit.addEventListener("click",async()=>{
         currentVideoObjectUrl=URL.createObjectURL(videoBlob);
         videoElement.src=currentVideoObjectUrl;videoElement.style.display="block";
         downloadVideoButton.href=currentVideoObjectUrl;downloadVideoButton.download=filename;downloadVideoButton.style.display="block";
-        setStatus("動画の延長が完了しました。"+warning,"success");
+        setStatus("動画の延長が完了しました。"+warning+formatJobTiming(statusData),"success");
         videoElement.scrollIntoView({behavior:"smooth",block:"start"});
         completed=true;break;
       }
       if(["FAILED","CANCELLED"].includes(statusData.status))throw new Error(statusData.error||statusData.output?.error||"延長ジョブが失敗しました。");
-      setStatus("動画延長中...\\nJob ID: "+jobId+"\\n状態: "+statusData.status);
+      setStatus("動画延長中...\nJob ID: "+jobId+"\n状態: "+statusData.status);
     }
     if(!completed)throw new Error("動画延長が15分以内に完了しませんでした。");
   }catch(error){console.error("Extension error:",error);setStatus("延長エラー: "+error.message,"error");}
