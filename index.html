@@ -123,7 +123,7 @@
     <textarea id="extendPrompt" placeholder="元動画の場面や動きを自然に続けてください"></textarea>
     <label for="extendSeconds">延長する長さ</label>
     <select id="extendSeconds"><option value="3">3秒</option><option value="5">5秒</option><option value="8">8秒</option><option value="10">10秒</option></select>
-    <p class="info">現在は約2MB以下の履歴動画に対応しています。大きな動画は送信できません。</p>
+    <p class="info">現在は3MiB以下の履歴動画に対応しています。大きな動画は送信できません。</p>
     <button type="button" id="extendSubmit">この動画を延長</button>
     <button type="button" id="extendCancel">キャンセル</button>
   </section>
@@ -292,7 +292,7 @@ extendSubmit.addEventListener("click",async()=>{
   try{
     const saved=await getHistoryItem(sourceId);
     if(!saved||!(saved.blob instanceof Blob))throw new Error("元動画が履歴に見つかりません。");
-    if(saved.blob.size>2*1024*1024)throw new Error("この動画は2MBを超えるため、現在のWeb版からは延長できません。");
+    if(saved.blob.size>3*1024*1024)throw new Error("この動画は3MiBを超えるため、現在のWeb版からは延長できません。");
     setStatus("動画を送信しています...");
     const video=await blobToBase64(saved.blob);
     const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"extend",prompt,extend_seconds:seconds,video,loras:getSelectedLoras()})});
