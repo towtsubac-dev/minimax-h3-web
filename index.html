@@ -131,6 +131,8 @@
     <label for="extendPassword">動画延長パスワード</label>
     <input id="extendPassword" type="password" autocomplete="off" placeholder="Vercelに設定したパスワード" style="width:100%;box-sizing:border-box;padding:12px;font-size:16px;margin-bottom:12px;">
     <p class="info">20MiB以下のMP4動画（端末または生成履歴）に対応しています。動画は非公開のR2へ一時アップロードされます。</p>
+    <button type="button" id="r2DiagnoseButton" style="margin-bottom:10px;">R2接続を診断</button>
+    <div id="r2DiagnosticResult" class="info" style="display:none;"></div>
     <button type="button" id="extendSubmit">この動画を延長</button>
     <button type="button" id="extendCancel">キャンセル</button>
   </section>
@@ -297,6 +299,14 @@ generateButton.addEventListener("click",async()=>{
 function setExtendPreview(blob){if(extendPreviewUrl)URL.revokeObjectURL(extendPreviewUrl);extendPreviewUrl=URL.createObjectURL(blob);extendPreview.src=extendPreviewUrl;extendPreview.style.display="block";}
 extendLocalFile.addEventListener("change",()=>{if(extendBusy)return;const file=extendLocalFile.files?.[0];extendSourceId=null;if(!file){extendSourceName.textContent="動画を選択してください。";extendPreview.style.display="none";extendPreview.removeAttribute("src");if(extendPreviewUrl)URL.revokeObjectURL(extendPreviewUrl);extendPreviewUrl=null;return;}if(!/\.mp4$/i.test(file.name)||file.type&&file.type!=="video/mp4"){extendLocalFile.value="";setStatus("MP4ファイルを選択してください。","error");return;}extendSourceName.textContent="端末動画: "+file.name+" ("+(file.size/1048576).toFixed(1)+" MiB)";setExtendPreview(file);});
 extendCancel.addEventListener("click",()=>{if(extendBusy)return;setMode("image");});
+document.getElementById("r2DiagnoseButton").addEventListener("click",async()=>{
+  const button=document.getElementById("r2DiagnoseButton"),result=document.getElementById("r2DiagnosticResult");
+  if(!extendPassword.value){result.style.display="block";result.textContent="動画延長パスワードを入力してください。";return;}
+  button.disabled=true;result.style.display="block";result.textContent="R2接続を診断しています...";
+  try{const response=await fetch("/api/r2-diagnostic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:extendPassword.value})});const data=await response.json();result.textContent=JSON.stringify({http_status:response.status,...data},null,2);}
+  catch(error){result.textContent="診断APIへの通信エラー: "+error.message;}
+  finally{button.disabled=false;}
+});
 extendSubmit.addEventListener("click",async()=>{
   if(extendBusy)return;
   const prompt=extendPrompt.value.trim(),seconds=Number(extendSeconds.value),sourceId=extendSourceId;
