@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { timingSafeEqual } from "node:crypto";
 
@@ -23,4 +23,14 @@ export async function signUpload(key) {
 }
 export async function signDownload(key) {
   return getSignedUrl(config(),new GetObjectCommand({Bucket:BUCKET,Key:key}),{expiresIn:3600});
+}
+
+export async function diagnoseR2() {
+  const client=config();
+  try {
+    const response=await client.send(new HeadBucketCommand({Bucket:BUCKET}));
+    return {ok:true,status:response.$metadata?.httpStatusCode||200};
+  } catch(error) {
+    return {ok:false,status:error.$metadata?.httpStatusCode||null,code:error.name||"Unknown",message:String(error.message||"").slice(0,180)};
+  }
 }
