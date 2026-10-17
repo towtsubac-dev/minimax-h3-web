@@ -123,7 +123,9 @@
     <textarea id="extendPrompt" placeholder="元動画の場面や動きを自然に続けてください"></textarea>
     <label for="extendSeconds">延長する長さ</label>
     <select id="extendSeconds"><option value="3">3秒</option><option value="5">5秒</option><option value="8">8秒</option><option value="10">10秒</option></select>
-    <p class="info">現在は3MiB以下の履歴動画に対応しています。大きな動画は送信できません。</p>
+    <label for="extendPassword">動画延長パスワード</label>
+    <input id="extendPassword" type="password" autocomplete="off" placeholder="Vercelに設定したパスワード" style="width:100%;box-sizing:border-box;padding:12px;font-size:16px;margin-bottom:12px;">
+    <p class="info">20MiB以下の履歴動画に対応しています。動画は非公開のR2へ一時アップロードされます。</p>
     <button type="button" id="extendSubmit">この動画を延長</button>
     <button type="button" id="extendCancel">キャンセル</button>
   </section>
@@ -195,6 +197,7 @@ const extendSection=document.getElementById("extendSection");
 const extendSourceName=document.getElementById("extendSourceName");
 const extendPrompt=document.getElementById("extendPrompt");
 const extendSeconds=document.getElementById("extendSeconds");
+const extendPassword=document.getElementById("extendPassword");
 const extendSubmit=document.getElementById("extendSubmit");
 const extendCancel=document.getElementById("extendCancel");
 let extendSourceId=null,extendBusy=false;
@@ -223,7 +226,7 @@ async function renderHistory() {
       thumbnail.addEventListener("loadedmetadata",()=>{try{thumbnail.currentTime=Math.min(0.1,Math.max(0,(thumbnail.duration||0)-0.01));}catch(error){console.warn("Thumbnail seek failed:",error);}});
       thumbnail.addEventListener("click",async()=>{try{await playHistoryItem(item.id);}catch(error){setStatus(`履歴の再生に失敗しました：${error.message}`,"error");}});
       const content=document.createElement("div");content.className="history-content";
-      const meta=document.createElement("div");meta.className="history-meta";meta.textContent=`${formatHistoryDate(item.createdAt)}\n${item.mode==="image"?"画像 → 動画":"テキスト → 動画"}・${item.duration}秒・${item.width} × ${item.height}`;
+      const meta=document.createElement("div");meta.className="history-meta";meta.textContent=`${formatHistoryDate(item.createdAt)}\n${item.mode==="extend"?"延長動画":item.mode==="image"?"画像 → 動画":"テキスト → 動画"}・${item.duration}秒・${item.width} × ${item.height}`;
       const actions=document.createElement("div");actions.className="history-actions";
       const playButton=document.createElement("button");playButton.type="button";playButton.textContent="再生";playButton.addEventListener("click",async()=>{try{await playHistoryItem(item.id);}catch(error){setStatus(`履歴の再生に失敗しました：${error.message}`,"error");}});
       const saveButton=document.createElement("button");saveButton.type="button";saveButton.textContent="保存";saveButton.addEventListener("click",async()=>{try{const saved=await getHistoryItem(item.id);if(!saved)throw new Error("履歴の動画が見つかりません。");const url=URL.createObjectURL(saved.blob);historyObjectUrls.add(url);const link=document.createElement("a");link.href=url;link.download=saved.filename;link.click();setTimeout(()=>{URL.revokeObjectURL(url);historyObjectUrls.delete(url);},60000);}catch(error){setStatus(`動画の保存に失敗しました：${error.message}`,"error");}});
@@ -292,10 +295,18 @@ extendSubmit.addEventListener("click",async()=>{
   try{
     const saved=await getHistoryItem(sourceId);
     if(!saved||!(saved.blob instanceof Blob))throw new Error("元動画が履歴に見つかりません。");
-    if(saved.blob.size>3*1024*1024)throw new Error("この動画は3MiBを超えるため、現在のWeb版からは延長できません。");
-    setStatus("動画を送信しています...");
-    const video=await blobToBase64(saved.blob);
-    const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"extend",prompt,extend_seconds:seconds,video,loras:getSelectedLoras()})});
+    if(saved.blob.size>20*1024*1024)throw new Error("この動画は20MiBを超えるため延長できません。");
+    const password=extendPassword.value;
+    if(!password)throw new Error("動画延長パスワードを入力してください。");
+    setStatus("R2へのアップロードを準備しています...");
+    const signingResponse=await fetch("/api/upload-url",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password,size:saved.blob.size})});
+    const signingData=await signingResponse.json();
+    if(!signingResponse.ok)throw new Error(signingData.error||"アップロードURLを取得できませんでした。");
+    setStatus("動画をR2へアップロードしています...");
+    const uploadResponse=await fetch(signingData.upload_url,{method:"PUT",headers:{"Content-Type":"video/mp4"},body:saved.blob});
+    if(!uploadResponse.ok)throw new Error("R2への動画アップロードに失敗しました。HTTP "+uploadResponse.status);
+    setStatus("動画延長を開始しています...");
+    const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"extend",prompt,extend_seconds:seconds,video_key:signingData.key,upload_password:password,loras:getSelectedLoras()})});
     const data=await response.json();
     if(!response.ok||!data.job_id)throw new Error(data.error||"延長ジョブを開始できませんでした。");
     const jobId=data.job_id;
