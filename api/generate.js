@@ -16,7 +16,9 @@ export default async function handler(req, res) {
       mode = "image",
       duration = 5,
       lora = "none",
-      loras
+      loras,
+      video,
+      extend_seconds
     } = req.body || {};
 
     // 秒数からH3のフレーム数へ変換
@@ -86,14 +88,30 @@ export default async function handler(req, res) {
       });
     }
 
-    if (!["image", "text"].includes(mode)) {
+    if (!["image", "text", "extend"].includes(mode)) {
       return res.status(400).json({
         error: "生成モードが不正です。"
       });
     }
 
+    if (mode === "extend" && ![3, 5, 8, 10].includes(Number(extend_seconds))) {
+      return res.status(400).json({ error: "延長時間は3秒、5秒、8秒、10秒から選択してください。" });
+    }
+
+    if (mode === "extend" && !String(prompt || "").trim()) {
+      return res.status(400).json({ error: "延長用プロンプトを入力してください。" });
+    }
+
+    if (mode === "extend" && (typeof video !== "string" || !video.trim())) {
+      return res.status(400).json({ error: "延長する動画がありません。" });
+    }
+
+    if (mode === "extend" && Buffer.byteLength(video || "", "utf8") > 3 * 1024 * 1024) {
+      return res.status(413).json({ error: "動画が大きすぎます。現在は約2MB以下のMP4に対応しています。" });
+    }
+
     if (
-      !Object.prototype.hasOwnProperty.call(
+      mode !== "extend" && !Object.prototype.hasOwnProperty.call(
         durationLengths,
         String(duration)
       )
@@ -181,9 +199,8 @@ export default async function handler(req, res) {
     // RunPodへ送信する入力
     const input = {
       action:
-        mode === "image"
-          ? "h3_generate"
-          : "h3_t2v_generate",
+        mode === "extend" ? "h3_extend_generate" :
+        mode === "image" ? "h3_generate" : "h3_t2v_generate",
       prompt: prompt || "",
       width: safeWidth,
       height: safeHeight,
@@ -193,9 +210,11 @@ export default async function handler(req, res) {
       loras: normalizedLoras
     };
 
-    // 画像モードの場合だけ画像を送信
-    if (mode === "image") {
-      input.image = image;
+    // 画像・動画は必要なモードでのみ送信する
+    if (mode === "image") input.image = image;
+    if (mode === "extend") {
+      input.video = video;
+      input.extend_seconds = Number(extend_seconds);
     }
 
     const payload = { input };
