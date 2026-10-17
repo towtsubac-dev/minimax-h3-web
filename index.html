@@ -116,6 +116,18 @@
   <video id="video" controls playsinline></video>
   <a id="downloadVideoButton" class="download-link" href="#" download="minimax-h3-video.mp4">動画を保存</a>
 
+  <section class="section" id="extendSection" style="display:none;">
+    <h2>動画を延長</h2>
+    <p id="extendSourceName"></p>
+    <label for="extendPrompt">延長部分のプロンプト</label>
+    <textarea id="extendPrompt" placeholder="元動画の場面や動きを自然に続けてください"></textarea>
+    <label for="extendSeconds">延長する長さ</label>
+    <select id="extendSeconds"><option value="3">3秒</option><option value="5">5秒</option><option value="8">8秒</option><option value="10">10秒</option></select>
+    <p class="info">現在は約2MB以下の履歴動画に対応しています。大きな動画は送信できません。</p>
+    <button type="button" id="extendSubmit">この動画を延長</button>
+    <button type="button" id="extendCancel">キャンセル</button>
+  </section>
+
   <section class="section" id="historySection">
     <h2>生成履歴</h2>
     <p class="history-empty">このブラウザに保存された動画がここに表示されます。履歴はこの端末・ブラウザ内だけに保存されます。</p>
@@ -179,6 +191,13 @@ const videoElement = document.getElementById("video");
 const downloadVideoButton = document.getElementById("downloadVideoButton");
 const resolutionInfo = document.getElementById("resolutionInfo");
 const historyList = document.getElementById("historyList");
+const extendSection=document.getElementById("extendSection");
+const extendSourceName=document.getElementById("extendSourceName");
+const extendPrompt=document.getElementById("extendPrompt");
+const extendSeconds=document.getElementById("extendSeconds");
+const extendSubmit=document.getElementById("extendSubmit");
+const extendCancel=document.getElementById("extendCancel");
+let extendSourceId=null,extendBusy=false;
 const HISTORY_DB_NAME="minimax-h3-video-history";
 const HISTORY_STORE_NAME="videos";
 let currentVideoObjectUrl=null;
@@ -209,7 +228,8 @@ async function renderHistory() {
       const playButton=document.createElement("button");playButton.type="button";playButton.textContent="再生";playButton.addEventListener("click",async()=>{try{await playHistoryItem(item.id);}catch(error){setStatus(`履歴の再生に失敗しました：${error.message}`,"error");}});
       const saveButton=document.createElement("button");saveButton.type="button";saveButton.textContent="保存";saveButton.addEventListener("click",async()=>{try{const saved=await getHistoryItem(item.id);if(!saved)throw new Error("履歴の動画が見つかりません。");const url=URL.createObjectURL(saved.blob);historyObjectUrls.add(url);const link=document.createElement("a");link.href=url;link.download=saved.filename;link.click();setTimeout(()=>{URL.revokeObjectURL(url);historyObjectUrls.delete(url);},60000);}catch(error){setStatus(`動画の保存に失敗しました：${error.message}`,"error");}});
       const deleteButton=document.createElement("button");deleteButton.type="button";deleteButton.textContent="削除";deleteButton.addEventListener("click",async()=>{if(!confirm("この動画を履歴から削除しますか？"))return;try{await deleteHistoryItem(item.id);await renderHistory();setStatus("履歴から動画を削除しました。","success");}catch(error){setStatus(`履歴の削除に失敗しました：${error.message}`,"error");}});
-      actions.append(playButton,saveButton,deleteButton);content.append(meta,actions);card.append(thumbnail,content);historyList.appendChild(card);
+      const extendButton=document.createElement("button");extendButton.type="button";extendButton.textContent="延長";extendButton.addEventListener("click",()=>{if(extendBusy)return;extendSourceId=item.id;extendSourceName.textContent="元動画: "+item.filename;extendPrompt.value=item.prompt||"Continue the video naturally, maintaining the same scene, subject, and camera movement.";extendSection.style.display="block";extendSection.scrollIntoView({behavior:"smooth",block:"start"});});
+      actions.append(playButton,saveButton,extendButton,deleteButton);content.append(meta,actions);card.append(thumbnail,content);historyList.appendChild(card);
     }
   } catch(error) { historyList.textContent="履歴を利用できませんでした。このブラウザがサイト内データの保存を許可しているか確認してください。";console.error("History error:",error); }
 }
@@ -217,7 +237,7 @@ async function storeGeneratedVideo(dataUrl,details){const response=await fetch(d
 
 let originalImage=null,naturalWidth=0,naturalHeight=0;
 function setStatus(message,type=""){statusElement.textContent=message;statusElement.className=type;}
-function updateGenerateButton(){const hasPrompt=promptInput.value.trim().length>0;if(currentMode==="image")generateButton.disabled=!originalImage||!hasPrompt;else generateButton.disabled=!hasPrompt;}
+function updateGenerateButton(){const hasPrompt=promptInput.value.trim().length>0;if(extendBusy){generateButton.disabled=true;return;}if(currentMode==="image")generateButton.disabled=!originalImage||!hasPrompt;else generateButton.disabled=!hasPrompt;}
 function updateModeUI(){const isImageMode=currentMode==="image";imageSection.style.display=isImageMode?"block":"none";if(!isImageMode)resolutionInfo.style.display="none";else if(originalImage)updateResolutionInfo();promptInput.placeholder=isImageMode?"画像からどのような動画にしたいか入力してください":"生成したい動画の場面や動きを入力してください";updateGenerateButton();}
 promptInput.addEventListener("input",updateGenerateButton);
 function calculateH3Resolution(){const BASE_SHORT_EDGE=768,MAX_PIXELS=768*1344,STEP=32;if(!naturalWidth||!naturalHeight)return{width:768,height:768};const aspectRatio=naturalWidth/naturalHeight;let width,height;if(aspectRatio>=1){height=BASE_SHORT_EDGE;width=height*aspectRatio;}else{width=BASE_SHORT_EDGE;height=width/aspectRatio;}if(width*height>MAX_PIXELS){const scale=Math.sqrt(MAX_PIXELS/(width*height));width*=scale;height*=scale;}width=Math.max(STEP,Math.round(width/STEP)*STEP);height=Math.max(STEP,Math.round(height/STEP)*STEP);while(width*height>MAX_PIXELS){if(width>=height)width-=STEP;else height-=STEP;}return{width,height};}
@@ -226,6 +246,7 @@ function updateResolutionInfo(){if(!naturalWidth||!naturalHeight||currentMode!==
 imageInput.addEventListener("change",()=>{const file=imageInput.files?.[0];if(!file){originalImage=null;naturalWidth=0;naturalHeight=0;preview.style.display="none";preview.removeAttribute("src");resolutionInfo.style.display="none";updateGenerateButton();return;}if(!file.type.startsWith("image/")){originalImage=null;preview.style.display="none";resolutionInfo.style.display="none";updateGenerateButton();setStatus("画像ファイルを選択してください。","error");return;}const reader=new FileReader();reader.onload=()=>{const image=new Image();image.onload=()=>{originalImage=image;naturalWidth=image.naturalWidth;naturalHeight=image.naturalHeight;preview.src=reader.result;preview.style.display="block";updateResolutionInfo();updateGenerateButton();setStatus("");};image.onerror=()=>{originalImage=null;naturalWidth=0;naturalHeight=0;updateGenerateButton();setStatus("画像の読み込みに失敗しました。","error");};image.src=reader.result;};reader.onerror=()=>{originalImage=null;naturalWidth=0;naturalHeight=0;updateGenerateButton();setStatus("画像ファイルの読み込みに失敗しました。","error");};reader.readAsDataURL(file);});
 
 generateButton.addEventListener("click",async()=>{
+  if(extendBusy)return;
   const mode=currentMode,duration=Number(durationSelect.value),prompt=promptInput.value.trim(),selectedLoras=getSelectedLoras();
   if(!prompt){setStatus("プロンプトを入力してください。","error");return;}
   savePromptHistory(prompt);
@@ -257,6 +278,59 @@ generateButton.addEventListener("click",async()=>{
     if(!completed)throw new Error("動画生成が15分以内に完了しませんでした。");
   }catch(error){console.error("Generation error:",error);setStatus(`エラー:\n${error.message}`,"error");}
   finally{controlsToLock.forEach(c=>{c.disabled=false;});updateModeUI();updateGenerateButton();}
+});
+
+
+extendCancel.addEventListener("click",()=>{if(extendBusy)return;extendSourceId=null;extendSection.style.display="none";});
+function blobToBase64(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",")[1]);reader.onerror=()=>reject(reader.error||new Error("動画を読み込めませんでした。"));reader.readAsDataURL(blob);});}
+extendSubmit.addEventListener("click",async()=>{
+  if(extendBusy||!extendSourceId)return;
+  const prompt=extendPrompt.value.trim(),seconds=Number(extendSeconds.value),sourceId=extendSourceId;
+  if(!prompt){setStatus("延長用プロンプトを入力してください。","error");return;}
+  if(![3,5,8,10].includes(seconds)){setStatus("延長時間が不正です。","error");return;}
+  extendBusy=true;extendSubmit.disabled=true;extendCancel.disabled=true;updateGenerateButton();
+  try{
+    const saved=await getHistoryItem(sourceId);
+    if(!saved||!(saved.blob instanceof Blob))throw new Error("元動画が履歴に見つかりません。");
+    if(saved.blob.size>2*1024*1024)throw new Error("この動画は2MBを超えるため、現在のWeb版からは延長できません。");
+    setStatus("動画を送信しています...");
+    const video=await blobToBase64(saved.blob);
+    const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"extend",prompt,extend_seconds:seconds,video,loras:getSelectedLoras()})});
+    const data=await response.json();
+    if(!response.ok||!data.job_id)throw new Error(data.error||"延長ジョブを開始できませんでした。");
+    const jobId=data.job_id;
+    let completed=false;
+    for(let attempt=0;attempt<180;attempt++){
+      await new Promise(resolve=>setTimeout(resolve,5000));
+      const result=await fetch("/api/status?job_id="+encodeURIComponent(jobId));
+      const statusData=await result.json();
+      if(!result.ok)throw new Error(statusData.error||"状態を確認できませんでした。");
+      if(statusData.status==="COMPLETED"){
+        const output=statusData.output?.outputs?.[0];
+        const encoded=output?.data||output?.video;
+        if(typeof encoded!=="string"||!encoded)throw new Error("延長動画データがありません。");
+        const dataUrl=encoded.startsWith("data:")?encoded:"data:video/mp4;base64,"+encoded;
+        const videoResponse=await fetch(dataUrl);
+        const videoBlob=await videoResponse.blob();
+        const createdAt=Date.now();
+        const filename="minimax-h3-extended-"+seconds+"s-"+new Date(createdAt).toISOString().replace(/[:.]/g,"-")+".mp4";
+        let warning="";
+        try{await saveHistoryItem({id:createdAt+"-"+Math.random().toString(36).slice(2),createdAt,filename,blob:videoBlob,mode:"extend",duration:(saved.duration||0)+seconds,prompt,width:saved.width,height:saved.height});await renderHistory();}
+        catch(error){console.error("Extend history save failed:",error);warning=" 履歴への保存には失敗しました。";}
+        if(currentVideoObjectUrl)URL.revokeObjectURL(currentVideoObjectUrl);
+        currentVideoObjectUrl=URL.createObjectURL(videoBlob);
+        videoElement.src=currentVideoObjectUrl;videoElement.style.display="block";
+        downloadVideoButton.href=currentVideoObjectUrl;downloadVideoButton.download=filename;downloadVideoButton.style.display="block";
+        setStatus("動画の延長が完了しました。"+warning,"success");
+        videoElement.scrollIntoView({behavior:"smooth",block:"start"});
+        completed=true;break;
+      }
+      if(["FAILED","CANCELLED"].includes(statusData.status))throw new Error(statusData.error||statusData.output?.error||"延長ジョブが失敗しました。");
+      setStatus("動画延長中...\\nJob ID: "+jobId+"\\n状態: "+statusData.status);
+    }
+    if(!completed)throw new Error("動画延長が15分以内に完了しませんでした。");
+  }catch(error){console.error("Extension error:",error);setStatus("延長エラー: "+error.message,"error");}
+  finally{extendBusy=false;extendSubmit.disabled=false;extendCancel.disabled=false;updateGenerateButton();}
 });
 
 updateModeUI();updateGenerateButton();renderHistory();renderPromptHistory();
