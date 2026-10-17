@@ -1,3 +1,4 @@
+import { verifyPassword, validObjectKey, signDownload } from "./_r2.js";
 export default async function handler(req, res) {
   console.log("STEP 1: generate.js started");
 
@@ -18,6 +19,8 @@ export default async function handler(req, res) {
       lora = "none",
       loras,
       video,
+      video_key,
+      upload_password,
       extend_seconds
     } = req.body || {};
 
@@ -102,12 +105,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "延長用プロンプトを入力してください。" });
     }
 
-    if (mode === "extend" && (typeof video !== "string" || !video.trim())) {
+    if (mode === "extend" && !validObjectKey(video_key)) {
       return res.status(400).json({ error: "延長する動画がありません。" });
     }
 
-    if (mode === "extend" && Buffer.byteLength(video || "", "utf8") > 4 * 1024 * 1024) {
-      return res.status(413).json({ error: "動画が大きすぎます。現在は3MiB以下のMP4に対応しています。" });
+    if (mode === "extend" && !verifyPassword(upload_password)) {
+      return res.status(401).json({ error: "動画延長パスワードが違います。" });
     }
 
     if (
@@ -213,7 +216,7 @@ export default async function handler(req, res) {
     // 画像・動画は必要なモードでのみ送信する
     if (mode === "image") input.image = image;
     if (mode === "extend") {
-      input.video = video;
+      input.video_url = await signDownload(video_key);
       input.extend_seconds = Number(extend_seconds);
     }
 
