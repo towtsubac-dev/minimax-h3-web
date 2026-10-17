@@ -303,7 +303,17 @@ document.getElementById("r2DiagnoseButton").addEventListener("click",async()=>{
   const button=document.getElementById("r2DiagnoseButton"),result=document.getElementById("r2DiagnosticResult");
   if(!extendPassword.value){result.style.display="block";result.textContent="動画延長パスワードを入力してください。";return;}
   button.disabled=true;result.style.display="block";result.textContent="R2接続を診断しています...";
-  try{const response=await fetch("/api/r2-diagnostic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:extendPassword.value})});const data=await response.json();result.textContent=JSON.stringify({http_status:response.status,...data},null,2);}
+  try{const response=await fetch("/api/r2-diagnostic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:extendPassword.value})});const data=await response.json();
+    if(response.ok&&data.bucket?.ok&&data.upload_url_check?.put_test?.status===200){
+      try{
+        const signResponse=await fetch("/api/upload-url",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:extendPassword.value,size:1})});
+        const signData=await signResponse.json();
+        if(!signResponse.ok)throw new Error(signData.error||"URL発行失敗: "+signResponse.status);
+        const putResponse=await fetch(signData.upload_url,{method:"PUT",headers:{"Content-Type":"video/mp4"},body:new Blob([new Uint8Array([0])],{type:"video/mp4"})});
+        data.browser_put_test={status:putResponse.status,ok:putResponse.ok};
+      }catch(error){data.browser_put_test={error:error.name||"Error",message:error.message};}
+    }
+    result.textContent=JSON.stringify({http_status:response.status,...data},null,2);}
   catch(error){result.textContent="診断APIへの通信エラー: "+error.message;}
   finally{button.disabled=false;}
 });
