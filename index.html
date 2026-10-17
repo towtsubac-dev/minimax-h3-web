@@ -60,10 +60,11 @@
     <div class="mode-tabs" role="tablist" aria-label="生成モード">
       <button type="button" class="mode-tab" id="imageModeTab" role="tab" aria-selected="true" aria-controls="imageSection">画像 → 動画</button>
       <button type="button" class="mode-tab" id="textModeTab" role="tab" aria-selected="false" aria-controls="prompt">テキスト → 動画</button>
+      <button type="button" class="mode-tab" id="extendModeTab" role="tab" aria-selected="false" aria-controls="extendSection">動画延長</button>
     </div>
   </div>
 
-  <div class="section">
+  <div class="section" id="durationSection">
     <label for="durationSelect">動画の長さ</label>
     <select id="durationSelect">
       <option value="3">3秒</option>
@@ -73,7 +74,7 @@
     </select>
   </div>
 
-  <div class="section">
+  <div class="section" id="loraSection">
     <label>追加LoRA（複数選択可）</label>
     <div class="lora-option">
       <label class="lora-check" for="loraHmnsfw"><input type="checkbox" id="loraHmnsfw" value="hmnsfw">HMNSFW AIO V2.5</label>
@@ -99,7 +100,7 @@
     <div id="resolutionInfo" class="info" style="display:none;"></div>
   </div>
 
-  <div class="section">
+  <div class="section" id="promptSection">
     <label for="prompt">プロンプト</label>
     <textarea id="prompt" placeholder="動画にしたい動きや場面を入力してください"></textarea>
     <div class="section" id="promptHistorySection">
@@ -110,7 +111,7 @@
     </div>
   </div>
 
-  <div class="section"><button id="generateButton" disabled>動画を生成</button></div>
+  <div class="section" id="generateSection"><button id="generateButton" disabled>動画を生成</button></div>
   <div id="status" role="status" aria-live="polite"></div>
 
   <video id="video" controls playsinline></video>
@@ -118,14 +119,18 @@
 
   <section class="section" id="extendSection" style="display:none;">
     <h2>動画を延長</h2>
-    <p id="extendSourceName"></p>
+    <label for="extendLocalFile">端末からMP4動画を選択</label>
+    <input id="extendLocalFile" type="file" accept=".mp4,video/mp4">
+    <p class="info">または、下の生成履歴にある「延長」ボタンから動画を選択できます。</p>
+    <p id="extendSourceName">動画を選択してください。</p>
+    <video id="extendPreview" controls playsinline preload="metadata" style="display:none;width:100%;max-height:320px;margin-bottom:12px;"></video>
     <label for="extendPrompt">延長部分のプロンプト</label>
     <textarea id="extendPrompt" placeholder="元動画の場面や動きを自然に続けてください"></textarea>
     <label for="extendSeconds">延長する長さ</label>
     <select id="extendSeconds"><option value="3">3秒</option><option value="5">5秒</option><option value="8">8秒</option><option value="10">10秒</option></select>
     <label for="extendPassword">動画延長パスワード</label>
     <input id="extendPassword" type="password" autocomplete="off" placeholder="Vercelに設定したパスワード" style="width:100%;box-sizing:border-box;padding:12px;font-size:16px;margin-bottom:12px;">
-    <p class="info">20MiB以下の履歴動画に対応しています。動画は非公開のR2へ一時アップロードされます。</p>
+    <p class="info">20MiB以下のMP4動画（端末または生成履歴）に対応しています。動画は非公開のR2へ一時アップロードされます。</p>
     <button type="button" id="extendSubmit">この動画を延長</button>
     <button type="button" id="extendCancel">キャンセル</button>
   </section>
@@ -139,10 +144,12 @@
 <script>
 const imageModeTab = document.getElementById("imageModeTab");
 const textModeTab = document.getElementById("textModeTab");
+const extendModeTab = document.getElementById("extendModeTab");
 let currentMode = "image";
-function setMode(mode) { currentMode = mode; imageModeTab.setAttribute("aria-selected", String(mode === "image")); textModeTab.setAttribute("aria-selected", String(mode === "text")); updateModeUI(); setStatus(""); }
+function setMode(mode) { if(extendBusy)return; currentMode = mode; imageModeTab.setAttribute("aria-selected", String(mode === "image")); textModeTab.setAttribute("aria-selected", String(mode === "text")); extendModeTab.setAttribute("aria-selected", String(mode === "extend")); updateModeUI(); setStatus(""); }
 imageModeTab.addEventListener("click", () => setMode("image"));
 textModeTab.addEventListener("click", () => setMode("text"));
+extendModeTab.addEventListener("click", () => setMode("extend"));
 
 const durationSelect = document.getElementById("durationSelect");
 const loraControls = [
@@ -195,6 +202,9 @@ const resolutionInfo = document.getElementById("resolutionInfo");
 const historyList = document.getElementById("historyList");
 const extendSection=document.getElementById("extendSection");
 const extendSourceName=document.getElementById("extendSourceName");
+const extendLocalFile=document.getElementById("extendLocalFile");
+const extendPreview=document.getElementById("extendPreview");
+let extendPreviewUrl=null;
 const extendPrompt=document.getElementById("extendPrompt");
 const extendSeconds=document.getElementById("extendSeconds");
 const extendPassword=document.getElementById("extendPassword");
@@ -231,7 +241,7 @@ async function renderHistory() {
       const playButton=document.createElement("button");playButton.type="button";playButton.textContent="再生";playButton.addEventListener("click",async()=>{try{await playHistoryItem(item.id);}catch(error){setStatus(`履歴の再生に失敗しました：${error.message}`,"error");}});
       const saveButton=document.createElement("button");saveButton.type="button";saveButton.textContent="保存";saveButton.addEventListener("click",async()=>{try{const saved=await getHistoryItem(item.id);if(!saved)throw new Error("履歴の動画が見つかりません。");const url=URL.createObjectURL(saved.blob);historyObjectUrls.add(url);const link=document.createElement("a");link.href=url;link.download=saved.filename;link.click();setTimeout(()=>{URL.revokeObjectURL(url);historyObjectUrls.delete(url);},60000);}catch(error){setStatus(`動画の保存に失敗しました：${error.message}`,"error");}});
       const deleteButton=document.createElement("button");deleteButton.type="button";deleteButton.textContent="削除";deleteButton.addEventListener("click",async()=>{if(!confirm("この動画を履歴から削除しますか？"))return;try{await deleteHistoryItem(item.id);await renderHistory();setStatus("履歴から動画を削除しました。","success");}catch(error){setStatus(`履歴の削除に失敗しました：${error.message}`,"error");}});
-      const extendButton=document.createElement("button");extendButton.type="button";extendButton.textContent="延長";extendButton.addEventListener("click",()=>{if(extendBusy)return;extendSourceId=item.id;extendSourceName.textContent="元動画: "+item.filename;extendPrompt.value=item.prompt||"Continue the video naturally, maintaining the same scene, subject, and camera movement.";extendSection.style.display="block";extendSection.scrollIntoView({behavior:"smooth",block:"start"});});
+      const extendButton=document.createElement("button");extendButton.type="button";extendButton.textContent="延長";extendButton.addEventListener("click",()=>{if(extendBusy)return;extendSourceId=item.id;extendLocalFile.value="";setExtendPreview(item.blob);extendSourceName.textContent="履歴動画: "+item.filename;extendPrompt.value=item.prompt||"Continue the video naturally, maintaining the same scene, subject, and camera movement.";setMode("extend");extendSection.scrollIntoView({behavior:"smooth",block:"start"});});
       actions.append(playButton,saveButton,extendButton,deleteButton);content.append(meta,actions);card.append(thumbnail,content);historyList.appendChild(card);
     }
   } catch(error) { historyList.textContent="履歴を利用できませんでした。このブラウザがサイト内データの保存を許可しているか確認してください。";console.error("History error:",error); }
@@ -240,8 +250,8 @@ async function storeGeneratedVideo(dataUrl,details){const response=await fetch(d
 
 let originalImage=null,naturalWidth=0,naturalHeight=0;
 function setStatus(message,type=""){statusElement.textContent=message;statusElement.className=type;}
-function updateGenerateButton(){const hasPrompt=promptInput.value.trim().length>0;if(extendBusy){generateButton.disabled=true;return;}if(currentMode==="image")generateButton.disabled=!originalImage||!hasPrompt;else generateButton.disabled=!hasPrompt;}
-function updateModeUI(){const isImageMode=currentMode==="image";imageSection.style.display=isImageMode?"block":"none";if(!isImageMode)resolutionInfo.style.display="none";else if(originalImage)updateResolutionInfo();promptInput.placeholder=isImageMode?"画像からどのような動画にしたいか入力してください":"生成したい動画の場面や動きを入力してください";updateGenerateButton();}
+function updateGenerateButton(){const hasPrompt=promptInput.value.trim().length>0;if(extendBusy||currentMode==="extend"){generateButton.disabled=true;return;}if(currentMode==="image")generateButton.disabled=!originalImage||!hasPrompt;else generateButton.disabled=!hasPrompt;}
+function updateModeUI(){const isExtend=currentMode==="extend",isImageMode=currentMode==="image";imageSection.style.display=isImageMode?"block":"none";for(const id of ["durationSection","loraSection","promptSection","generateSection"])document.getElementById(id).style.display=isExtend?"none":"block";extendSection.style.display=isExtend?"block":"none";if(!isImageMode)resolutionInfo.style.display="none";else if(originalImage)updateResolutionInfo();promptInput.placeholder=isImageMode?"画像からどのような動画にしたいか入力してください":"生成したい動画の場面や動きを入力してください";updateGenerateButton();}
 promptInput.addEventListener("input",updateGenerateButton);
 function calculateH3Resolution(){const BASE_SHORT_EDGE=768,MAX_PIXELS=768*1344,STEP=32;if(!naturalWidth||!naturalHeight)return{width:768,height:768};const aspectRatio=naturalWidth/naturalHeight;let width,height;if(aspectRatio>=1){height=BASE_SHORT_EDGE;width=height*aspectRatio;}else{width=BASE_SHORT_EDGE;height=width/aspectRatio;}if(width*height>MAX_PIXELS){const scale=Math.sqrt(MAX_PIXELS/(width*height));width*=scale;height*=scale;}width=Math.max(STEP,Math.round(width/STEP)*STEP);height=Math.max(STEP,Math.round(height/STEP)*STEP);while(width*height>MAX_PIXELS){if(width>=height)width-=STEP;else height-=STEP;}return{width,height};}
 async function prepareImageForH3(){if(!originalImage)throw new Error("画像が選択されていません。");const resolution=calculateH3Resolution();const canvas=document.createElement("canvas");canvas.width=resolution.width;canvas.height=resolution.height;const ctx=canvas.getContext("2d");if(!ctx)throw new Error("Canvasを取得できませんでした。");ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(originalImage,0,0,resolution.width,resolution.height);return{dataUrl:canvas.toDataURL("image/jpeg",0.92),width:resolution.width,height:resolution.height};}
@@ -255,7 +265,7 @@ generateButton.addEventListener("click",async()=>{
   savePromptHistory(prompt);
   if(mode==="image"&&!originalImage){setStatus("画像を選択してください。","error");return;}
   generateButton.disabled=true;
-  const controlsToLock=[imageModeTab,textModeTab,durationSelect,imageInput,promptInput,...loraControls.flatMap(c=>[c.checkbox,c.strength])];controlsToLock.forEach(c=>{c.disabled=true;});
+  const controlsToLock=[imageModeTab,textModeTab,extendModeTab,durationSelect,imageInput,promptInput,...loraControls.flatMap(c=>[c.checkbox,c.strength])];controlsToLock.forEach(c=>{c.disabled=true;});
   videoElement.pause();videoElement.style.display="none";videoElement.removeAttribute("src");videoElement.load();downloadVideoButton.style.display="none";downloadVideoButton.removeAttribute("href");
   try{
     let imageData=null,width=768,height=768;
@@ -284,18 +294,20 @@ generateButton.addEventListener("click",async()=>{
 });
 
 
-extendCancel.addEventListener("click",()=>{if(extendBusy)return;extendSourceId=null;extendSection.style.display="none";});
-function blobToBase64(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",")[1]);reader.onerror=()=>reject(reader.error||new Error("動画を読み込めませんでした。"));reader.readAsDataURL(blob);});}
+function setExtendPreview(blob){if(extendPreviewUrl)URL.revokeObjectURL(extendPreviewUrl);extendPreviewUrl=URL.createObjectURL(blob);extendPreview.src=extendPreviewUrl;extendPreview.style.display="block";}
+extendLocalFile.addEventListener("change",()=>{if(extendBusy)return;const file=extendLocalFile.files?.[0];extendSourceId=null;if(!file){extendSourceName.textContent="動画を選択してください。";extendPreview.style.display="none";extendPreview.removeAttribute("src");if(extendPreviewUrl)URL.revokeObjectURL(extendPreviewUrl);extendPreviewUrl=null;return;}if(!/\.mp4$/i.test(file.name)||file.type&&file.type!=="video/mp4"){extendLocalFile.value="";setStatus("MP4ファイルを選択してください。","error");return;}extendSourceName.textContent="端末動画: "+file.name+" ("+(file.size/1048576).toFixed(1)+" MiB)";setExtendPreview(file);});
+extendCancel.addEventListener("click",()=>{if(extendBusy)return;setMode("image");});
 extendSubmit.addEventListener("click",async()=>{
-  if(extendBusy||!extendSourceId)return;
+  if(extendBusy)return;
   const prompt=extendPrompt.value.trim(),seconds=Number(extendSeconds.value),sourceId=extendSourceId;
   if(!prompt){setStatus("延長用プロンプトを入力してください。","error");return;}
   if(![3,5,8,10].includes(seconds)){setStatus("延長時間が不正です。","error");return;}
-  extendBusy=true;extendSubmit.disabled=true;extendCancel.disabled=true;updateGenerateButton();
+  extendBusy=true;extendSubmit.disabled=true;extendCancel.disabled=true;extendLocalFile.disabled=true;imageModeTab.disabled=true;textModeTab.disabled=true;extendModeTab.disabled=true;updateGenerateButton();
   try{
-    const saved=await getHistoryItem(sourceId);
-    if(!saved||!(saved.blob instanceof Blob))throw new Error("元動画が履歴に見つかりません。");
-    if(saved.blob.size>20*1024*1024)throw new Error("この動画は20MiBを超えるため延長できません。");
+    let saved;
+    if(sourceId){saved=await getHistoryItem(sourceId);if(!saved||!(saved.blob instanceof Blob))throw new Error("元動画が履歴に見つかりません。");}
+    else {const file=extendLocalFile.files?.[0];if(!file)throw new Error("延長するMP4動画を選択してください。");if(!/\.mp4$/i.test(file.name)||file.type&&file.type!=="video/mp4")throw new Error("MP4ファイルを選択してください。");saved={blob:file,filename:file.name,mode:"local",duration:0,width:0,height:0};}
+    if(saved.blob.size<=0||saved.blob.size>20*1024*1024)throw new Error("動画は20MiB以下のMP4を選択してください。");
     const password=extendPassword.value;
     if(!password)throw new Error("動画延長パスワードを入力してください。");
     setStatus("R2へのアップロードを準備しています...");
@@ -341,7 +353,7 @@ extendSubmit.addEventListener("click",async()=>{
     }
     if(!completed)throw new Error("動画延長が15分以内に完了しませんでした。");
   }catch(error){console.error("Extension error:",error);setStatus("延長エラー: "+error.message,"error");}
-  finally{extendBusy=false;extendSubmit.disabled=false;extendCancel.disabled=false;updateGenerateButton();}
+  finally{extendBusy=false;extendSubmit.disabled=false;extendCancel.disabled=false;extendLocalFile.disabled=false;imageModeTab.disabled=false;textModeTab.disabled=false;extendModeTab.disabled=false;updateGenerateButton();}
 });
 
 updateModeUI();updateGenerateButton();renderHistory();renderPromptHistory();
