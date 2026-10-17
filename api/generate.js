@@ -106,8 +106,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "延長する動画がありません。" });
     }
 
-    if (mode === "extend" && Buffer.byteLength(video || "", "utf8") > 3 * 1024 * 1024) {
-      return res.status(413).json({ error: "動画が大きすぎます。現在は約2MB以下のMP4に対応しています。" });
+    if (mode === "extend" && Buffer.byteLength(video || "", "utf8") > 4 * 1024 * 1024) {
+      return res.status(413).json({ error: "動画が大きすぎます。現在は3MiB以下のMP4に対応しています。" });
     }
 
     if (
