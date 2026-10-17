@@ -334,9 +334,9 @@ extendSubmit.addEventListener("click",async()=>{
     const signingResponse=await fetch("/api/upload-url",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password,size:saved.blob.size})});
     const signingData=await signingResponse.json();
     if(!signingResponse.ok)throw new Error(signingData.error||"アップロードURLを取得できませんでした。");
-    setStatus("動画をR2へアップロードしています...");
-    let uploadResponse;try{uploadResponse=await fetch(signingData.upload_url,{method:"PUT",headers:{"Content-Type":"video/mp4"},body:saved.blob});}catch(uploadError){throw new Error("R2への接続に失敗しました。CORS設定・署名付きURL・通信環境を確認してください（ブラウザ: "+uploadError.message+"）。");}
-    if(!uploadResponse.ok)throw new Error("R2への動画アップロードに失敗しました。HTTP "+uploadResponse.status);
+    setStatus("動画をCloudflare Worker経由でアップロードしています...");
+    let uploadResponse;try{uploadResponse=await fetch(signingData.upload_url,{method:"PUT",headers:{"Content-Type":"video/mp4"},body:saved.blob});}catch(uploadError){throw new Error("Cloudflare Workerへのアップロード通信に失敗しました（ブラウザ: "+uploadError.message+"）。");}
+    if(!uploadResponse.ok)throw new Error("Cloudflare Workerへの動画アップロードに失敗しました。HTTP "+uploadResponse.status);
     setStatus("動画延長を開始しています...");
     const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"extend",prompt,extend_seconds:seconds,video_key:signingData.key,upload_password:password,loras:getSelectedLoras()})});
     const data=await response.json();
