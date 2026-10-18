@@ -28,7 +28,6 @@ export default async function handler(req, res) {
     } = req.body || {};
 
     if (!["h3", "erosmax"].includes(model)) return res.status(400).json({ error: "モデル指定が不正です。" });
-    if (model === "erosmax" && mode === "extend") return res.status(400).json({ error: "Eros Maxの動画延長には未対応です。" });
     if (model === "erosmax" && ![5].includes(Number(duration))) return res.status(400).json({ error: "Eros Maxは現在5秒のみ対応しています。" });
     if (model === "erosmax" && mode === "image" && !image) return res.status(400).json({ error: "Eros Max用の画像がありません。" });
     if (model === "erosmax" && (!Number.isFinite(Number(lora_strength)) || Number(lora_strength) < 0 || Number(lora_strength) > 2)) return res.status(400).json({ error: "Eros MaxのLoRA強度が不正です。" });
@@ -224,7 +223,7 @@ export default async function handler(req, res) {
     };
 
     if (model === "erosmax") {
-      input.action = mode === "image" ? "h3_i2v_generate" : "h3_t2v_generate";
+      if (mode !== "extend") input.action = mode === "image" ? "h3_i2v_generate" : "h3_t2v_generate";
       delete input.loras;
       input.lora = lora === "bounce_fl2va" ? "bounce_fl2va" : "none";
       input.lora_strength = Number(lora_strength);
@@ -267,7 +266,7 @@ export default async function handler(req, res) {
 
     try {
       runpodResponse = await fetch(
-        `https://api.runpod.ai/v2/${model === "erosmax" ? "2gdf5g88h8jsmm" : "18lt7ar99rsrfw"}/run`,
+        `https://api.runpod.ai/v2/${model === "erosmax" && mode === "extend" ? "qdu7le19os7loq" : model === "erosmax" ? "2gdf5g88h8jsmm" : "18lt7ar99rsrfw"}/run`,
         {
           method: "POST",
           headers: {
