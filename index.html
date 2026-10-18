@@ -344,7 +344,7 @@ function formatJobTiming(statusData){
   return "\n\n"+lines.join("\n");
 }
 function updateGenerateButton(){const hasPrompt=promptInput.value.trim().length>0;if(extendBusy||currentMode==="extend"){generateButton.disabled=true;return;}if(currentMode==="image")generateButton.disabled=!originalImage||!hasPrompt;else generateButton.disabled=!hasPrompt;}
-function updateModeUI(){const isExtend=currentMode==="extend",isImageMode=currentMode==="image";imageSection.style.display=isImageMode?"block":"none";for(const id of ["durationSection","promptSection","generateSection"])document.getElementById(id).style.display=isExtend?"none":"block";document.getElementById("loraSection").style.display=modelSelect.value==="erosmax"?"none":"block";document.getElementById("erosLoraSection").style.display=modelSelect.value==="erosmax"?"block":"none";extendModeTab.disabled=false;extendSection.style.display=isExtend?"block":"none";document.getElementById("extendSeconds").disabled=modelSelect.value==="erosmax";document.getElementById("extendSeconds").value=modelSelect.value==="erosmax"?"5":document.getElementById("extendSeconds").value;document.getElementById("extendPassword").style.display="";document.querySelector("label[for=extendPassword]").style.display="";document.getElementById("r2DiagnoseButton").style.display="";document.getElementById("extendHelp").textContent=modelSelect.value==="erosmax"?"ErosMaxのコンテキスト動画延長（5秒）をテスト用RunPodで実行します。MP4はR2経由で送信されます。":"20MiB以下のMP4動画（端末または生成履歴）に対応しています。動画は非公開のR2へ一時アップロードされます。";if(!isImageMode)resolutionInfo.style.display="none";else if(originalImage)updateResolutionInfo();promptInput.placeholder=isImageMode?"画像からどのような動画にしたいか入力してください":"生成したい動画の場面や動きを入力してください";updateGenerateButton();}
+function updateModeUI(){const isExtend=currentMode==="extend",isImageMode=currentMode==="image";imageSection.style.display=isImageMode?"block":"none";for(const id of ["durationSection","promptSection","generateSection"])document.getElementById(id).style.display=isExtend?"none":"block";document.getElementById("loraSection").style.display=modelSelect.value==="erosmax"?"none":"block";document.getElementById("erosLoraSection").style.display=modelSelect.value==="erosmax"?"block":"none";extendModeTab.disabled=false;extendSection.style.display=isExtend?"block":"none";document.getElementById("extendSeconds").disabled=modelSelect.value==="erosmax";document.getElementById("extendSeconds").value=modelSelect.value==="erosmax"?"5":document.getElementById("extendSeconds").value;document.getElementById("extendPassword").style.display=modelSelect.value==="erosmax"?"none":"";document.querySelector("label[for=extendPassword]").style.display=modelSelect.value==="erosmax"?"none":"";document.getElementById("r2DiagnoseButton").style.display=modelSelect.value==="erosmax"?"none":"";document.getElementById("extendHelp").textContent=modelSelect.value==="erosmax"?"ErosMaxの動画コンテキスト延長（5秒）テストです。2.8MB以下のMP4を直接RunPodへ送信します。パスワード・R2設定は不要です。":"20MiB以下のMP4動画（端末または生成履歴）に対応しています。動画は非公開のR2へ一時アップロードされます。";if(!isImageMode)resolutionInfo.style.display="none";else if(originalImage)updateResolutionInfo();promptInput.placeholder=isImageMode?"画像からどのような動画にしたいか入力してください":"生成したい動画の場面や動きを入力してください";updateGenerateButton();}
 promptInput.addEventListener("input",updateGenerateButton);
 function calculateH3Resolution(){const BASE_SHORT_EDGE=768,MAX_PIXELS=768*1344,STEP=32;if(!naturalWidth||!naturalHeight)return{width:768,height:768};const aspectRatio=naturalWidth/naturalHeight;let width,height;if(aspectRatio>=1){height=BASE_SHORT_EDGE;width=height*aspectRatio;}else{width=BASE_SHORT_EDGE;height=width/aspectRatio;}if(width*height>MAX_PIXELS){const scale=Math.sqrt(MAX_PIXELS/(width*height));width*=scale;height*=scale;}width=Math.max(STEP,Math.round(width/STEP)*STEP);height=Math.max(STEP,Math.round(height/STEP)*STEP);while(width*height>MAX_PIXELS){if(width>=height)width-=STEP;else height-=STEP;}return{width,height};}
 async function prepareImageForH3(){if(!originalImage)throw new Error("画像が選択されていません。");const resolution=calculateH3Resolution();const canvas=document.createElement("canvas");canvas.width=resolution.width;canvas.height=resolution.height;const ctx=canvas.getContext("2d");if(!ctx)throw new Error("Canvasを取得できませんでした。");ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(originalImage,0,0,resolution.width,resolution.height);return{dataUrl:canvas.toDataURL("image/jpeg",0.92),width:resolution.width,height:resolution.height};}
@@ -465,6 +465,43 @@ async function extendErosMax(saved,prompt){
   }
   throw new Error("15分以内に動画生成が完了しませんでした。");
 }
+
+async function extendErosContextDirect(saved,prompt){
+  if(saved.blob.size>2800000)throw new Error("テスト用の直接送信はMP4が2.8MB以下の場合のみ対応します。");
+  setStatus("MP4をRunPodテスト用Endpointに送信しています...");
+  const video=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result).split(",").pop());
+    reader.onerror=()=>reject(new Error("MP4を読み込めませんでした。"));
+    reader.readAsDataURL(saved.blob);
+  });
+  const response=await fetch("/api/eros-context-test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({video,prompt,extend_seconds:5})});
+  const data=await response.json();
+  if(!response.ok||!data.job_id)throw new Error(data.error||"テストジョブ登録に失敗しました。");
+  for(let attempt=0;attempt<180;attempt++){
+    await new Promise(resolve=>setTimeout(resolve,5000));
+    const result=await fetch("/api/status?job_id="+encodeURIComponent(data.job_id)+"&model=erosmax_extend");
+    const statusData=await result.json();
+    if(!result.ok)throw new Error(statusData.error||"ジョブ状態を取得できません。");
+    if(statusData.status==="COMPLETED"){
+      if(statusData.output?.status==="error")throw new Error(statusData.output.error||"RunPodでエラーが発生しました。");
+      const output=statusData.output?.outputs?.[0];
+      const encoded=output?.data||output?.video;
+      if(typeof encoded!=="string"||!encoded)throw new Error("延長後のMP4データがありません。");
+      const blob=await(await fetch(encoded.startsWith("data:")?encoded:"data:video/mp4;base64,"+encoded)).blob();
+      const createdAt=Date.now(),filename="erosmax-context-extended-"+createdAt+".mp4";
+      try{await saveHistoryItem({id:createdAt+"-"+Math.random().toString(36).slice(2),createdAt,filename,blob,mode:"extend",duration:(saved.duration||0)+5,prompt,width:saved.width,height:saved.height});await renderHistory();}catch(error){console.warn("History save failed:",error);}
+      if(currentVideoObjectUrl)URL.revokeObjectURL(currentVideoObjectUrl);
+      currentVideoObjectUrl=URL.createObjectURL(blob);videoElement.src=currentVideoObjectUrl;videoElement.style.display="block";
+      downloadVideoButton.href=currentVideoObjectUrl;downloadVideoButton.download=filename;downloadVideoButton.style.display="block";
+      setStatus("動画コンテキスト延長が完了しました。"+formatJobTiming(statusData),"success");
+      videoElement.scrollIntoView({behavior:"smooth",block:"start"});return;
+    }
+    if(["FAILED","CANCELLED"].includes(statusData.status))throw new Error(statusData.error||statusData.output?.error||"RunPod動画延長が失敗しました。");
+    setStatus("ErosMax動画コンテキスト延長を実行中...\nJob ID: "+data.job_id+"\n状態: "+statusData.status);
+  }
+  throw new Error("15分以内に動画生成が完了しませんでした。");
+}
 extendSubmit.addEventListener("click",async()=>{
   if(extendBusy)return;
   const prompt=extendPrompt.value.trim(),seconds=Number(extendSeconds.value),sourceId=extendSourceId;
@@ -476,6 +513,7 @@ extendSubmit.addEventListener("click",async()=>{
     if(sourceId){saved=await getHistoryItem(sourceId);if(!saved||!(saved.blob instanceof Blob))throw new Error("元動画が履歴に見つかりません。");}
     else {const file=extendLocalFile.files?.[0];if(!file)throw new Error("延長するMP4動画を選択してください。");if(!/\.mp4$/i.test(file.name)||file.type&&file.type!=="video/mp4")throw new Error("MP4ファイルを選択してください。");saved={blob:file,filename:file.name,mode:"local",duration:0,width:0,height:0};}
     if(saved.blob.size<=0||saved.blob.size>20*1024*1024)throw new Error("動画は20MiB以下のMP4を選択してください。");
+    if(modelSelect.value==="erosmax"){await extendErosContextDirect(saved,prompt);return;}
     const password=extendPassword.value;
     if(!password)throw new Error("動画延長パスワードを入力してください。");
     setStatus("R2へのアップロードを準備しています...");
