@@ -9,7 +9,7 @@ module.exports = async function handler(req, res) {
 
   const jobId = req.query?.job_id;
   const model = req.query?.model || "h3";
-  const endpointIds = { h3: "18lt7ar99rsrfw", erosmax: "2gdf5g88h8jsmm" };
+  const endpointIds = { h3: "18lt7ar99rsrfw", erosmax: "2gdf5g88h8jsmm", erosmax_extend: "qdu7le19os7loq" };
   if (!Object.prototype.hasOwnProperty.call(endpointIds, model)) {
     return res.status(400).json({ error: "モデル指定が不正です。" });
   }
