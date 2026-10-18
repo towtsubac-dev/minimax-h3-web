@@ -64,6 +64,8 @@
 <body>
   <h1>MiniMax H3 動画生成</h1>
 
+  <div class="section"><label for="modelSelect">生成モデル</label><select id="modelSelect"><option value="h3">MiniMax H3</option><option value="erosmax">Eros Max H3</option></select></div>
+
   <div class="section">
     <label>生成モード</label>
     <div class="mode-tabs" role="tablist" aria-label="生成モード">
@@ -82,6 +84,8 @@
       <option value="10">10秒</option>
     </select>
   </div>
+
+  <div class="section" id="erosLoraSection" style="display:none"><label for="erosLora">Eros Max LoRA</label><select id="erosLora"><option value="none">なし</option><option value="bounce_fl2va">Bounce FL2VA</option></select><div class="lora-strength"><label for="erosStrength">強度：<span id="erosStrengthValue">0.80</span></label><input type="range" id="erosStrength" min="0" max="2" step="0.05" value="0.8"></div></div>
 
   <div class="section" id="loraSection">
     <label>追加LoRA（複数選択可）</label>
@@ -171,6 +175,22 @@ textModeTab.addEventListener("click", () => setMode("text"));
 extendModeTab.addEventListener("click", () => setMode("extend"));
 
 const durationSelect = document.getElementById("durationSelect");
+const modelSelect = document.getElementById("modelSelect");
+const erosLora = document.getElementById("erosLora");
+const erosStrength = document.getElementById("erosStrength");
+const erosStrengthValue = document.getElementById("erosStrengthValue");
+erosStrength.addEventListener("input",()=>{erosStrengthValue.textContent=Number(erosStrength.value).toFixed(2);});
+let h3Duration = durationSelect.value;
+modelSelect.addEventListener("change",()=>{
+  const eros=modelSelect.value==="erosmax";
+  document.getElementById("loraSection").style.display=eros?"none":"";
+  document.getElementById("erosLoraSection").style.display=eros?"":"none";
+  for(const option of durationSelect.options) option.disabled=eros&&option.value!=="5";
+  if(eros){h3Duration=durationSelect.value;durationSelect.value="5";if(currentMode==="extend")setMode("image");}
+  else durationSelect.value=h3Duration;
+  extendModeTab.disabled=eros;
+  updateModeUI();updateGenerateButton();
+});
 const loraControls = [
   { name:"hmnsfw", checkbox:document.getElementById("loraHmnsfw"), strength:document.getElementById("strengthHmnsfw"), value:document.getElementById("strengthHmnsfwValue") },
   { name:"free_pussy", checkbox:document.getElementById("loraFreePussy"), strength:document.getElementById("strengthFreePussy"), value:document.getElementById("strengthFreePussyValue") },
@@ -333,25 +353,25 @@ imageInput.addEventListener("change",()=>{const file=imageInput.files?.[0];if(!f
 
 generateButton.addEventListener("click",async()=>{
   if(extendBusy)return;
-  const mode=currentMode,duration=Number(durationSelect.value),prompt=promptInput.value.trim(),selectedLoras=getSelectedLoras();
+  const mode=currentMode,duration=Number(durationSelect.value),prompt=promptInput.value.trim(),selectedLoras=getSelectedLoras(),model=modelSelect.value;
   if(!prompt){setStatus("プロンプトを入力してください。","error");return;}
   savePromptHistory(prompt);
   if(mode==="image"&&!originalImage){setStatus("画像を選択してください。","error");return;}
   generateButton.disabled=true;
-  const controlsToLock=[imageModeTab,textModeTab,extendModeTab,durationSelect,imageInput,promptInput,...loraControls.flatMap(c=>[c.checkbox,c.strength])];controlsToLock.forEach(c=>{c.disabled=true;});
+  const controlsToLock=[modelSelect,erosLora,erosStrength,imageModeTab,textModeTab,extendModeTab,durationSelect,imageInput,promptInput,...loraControls.flatMap(c=>[c.checkbox,c.strength])];controlsToLock.forEach(c=>{c.disabled=true;});
   videoElement.pause();videoElement.style.display="none";videoElement.removeAttribute("src");videoElement.load();downloadVideoButton.style.display="none";downloadVideoButton.removeAttribute("href");
   try{
     let imageData=null,width=768,height=768;
     if(mode==="image"){setStatus("画像をH3用の解像度に変換しています...");const prepared=await prepareImageForH3();imageData=prepared.dataUrl;width=prepared.width;height=prepared.height;}
     setStatus("動画生成を開始しています。\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さ: ${duration}秒\n`+`生成解像度: ${width} × ${height}`);
-    const requestBody={mode,duration,prompt,width,height,loras:selectedLoras};if(mode==="image")requestBody.image=imageData;
+    const requestBody={mode,duration,prompt,width,height,model,loras:selectedLoras};if(model==="erosmax"){requestBody.lora=erosLora.value;requestBody.lora_strength=Number(erosStrength.value);}if(mode==="image")requestBody.image=imageData;
     const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(requestBody)});const responseText=await response.text();let data;try{data=JSON.parse(responseText);}catch{throw new Error("サーバーからJSONではないレスポンスが返りました。\n"+`HTTP ${response.status}\n`+responseText.slice(0,500));}
     if(!response.ok)throw new Error(data.error||"動画生成ジョブの登録に失敗しました。");if(!data.job_id)throw new Error("RunPodのjob IDを取得できませんでした。");const jobId=data.job_id;
     setStatus("動画生成中です。\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さ: ${duration}秒\n`+`解像度: ${width} × ${height}\n`+`Job ID: ${jobId}`);
     const MAX_ATTEMPTS=180;let completed=false;
     for(let attempt=0;attempt<MAX_ATTEMPTS;attempt++){
       await new Promise(resolve=>setTimeout(resolve,5000));
-      const statusResponse=await fetch(`/api/status?job_id=${encodeURIComponent(jobId)}`);const statusText=await statusResponse.text();let statusData;try{statusData=JSON.parse(statusText);}catch{throw new Error("ステータスAPIからJSONではないレスポンスが返りました。\n"+`HTTP ${statusResponse.status}\n`+statusText.slice(0,500));}
+      const statusResponse=await fetch(`/api/status?job_id=${encodeURIComponent(jobId)}&model=${encodeURIComponent(model)}`);const statusText=await statusResponse.text();let statusData;try{statusData=JSON.parse(statusText);}catch{throw new Error("ステータスAPIからJSONではないレスポンスが返りました。\n"+`HTTP ${statusResponse.status}\n`+statusText.slice(0,500));}
       if(!statusResponse.ok)throw new Error(statusData.error||"ステータス取得に失敗しました。");console.log("RunPod status:",statusData);
       if(statusData.status==="COMPLETED"){
         completed=true;const outputs=statusData.output?.outputs;if(!outputs||!outputs.length)throw new Error("生成完了しましたが、動画データが見つかりません。");const output=outputs[0];let videoBase64=output.video||output.data||output;if(typeof videoBase64!=="string")throw new Error("動画データの形式を認識できません。");videoElement.src=videoBase64.startsWith("data:")?videoBase64:`data:video/mp4;base64,${videoBase64}`;videoElement.style.display="block";downloadVideoButton.href=videoElement.src;downloadVideoButton.download=`minimax-h3-${mode}-${duration}s-${new Date().toISOString().replace(/[:.]/g,"-")}.mp4`;downloadVideoButton.style.display="block";
@@ -363,7 +383,7 @@ generateButton.addEventListener("click",async()=>{
     }
     if(!completed)throw new Error("動画生成が15分以内に完了しませんでした。");
   }catch(error){console.error("Generation error:",error);setStatus(`エラー:\n${error.message}`,"error");}
-  finally{controlsToLock.forEach(c=>{c.disabled=false;});updateModeUI();updateGenerateButton();}
+  finally{controlsToLock.forEach(c=>{c.disabled=false;});if(modelSelect.value==="erosmax")extendModeTab.disabled=true;updateModeUI();updateGenerateButton();}
 });
 
 
