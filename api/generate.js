@@ -11,6 +11,9 @@ export default async function handler(req, res) {
   try {
     const {
       image,
+      image_url,
+      model = "h3",
+      lora_strength = 0.8,
       prompt,
       width,
       height,
@@ -23,6 +26,11 @@ export default async function handler(req, res) {
       upload_password,
       extend_seconds
     } = req.body || {};
+
+    if (!["h3", "erosmax"].includes(model)) return res.status(400).json({ error: "モデル指定が不正です。" });
+    if (model === "erosmax" && ![5].includes(Number(duration))) return res.status(400).json({ error: "Eros Maxは現在5秒のみ対応しています。" });
+    if (model === "erosmax" && mode === "image" && !image) return res.status(400).json({ error: "Eros Max用の画像がありません。" });
+    if (model === "erosmax" && (!Number.isFinite(Number(lora_strength)) || Number(lora_strength) < 0 || Number(lora_strength) > 2)) return res.status(400).json({ error: "Eros MaxのLoRA強度が不正です。" });
 
     // 秒数からH3のフレーム数へ変換
     const durationLengths = {
@@ -50,6 +58,7 @@ export default async function handler(req, res) {
           : [];
     }
 
+    if (model === "erosmax") requestedLoras = [];
     if (!Array.isArray(requestedLoras) || requestedLoras.length > 3) {
       return res.status(400).json({
         error: "追加LoRAの指定が不正です。"
@@ -125,7 +134,7 @@ export default async function handler(req, res) {
       });
     }
 
-    if (mode === "image" && !image) {
+    if (model === "h3" && mode === "image" && !image) {
       return res.status(400).json({
         error: "画像がありません。"
       });
@@ -213,8 +222,16 @@ export default async function handler(req, res) {
       loras: normalizedLoras
     };
 
+    if (model === "erosmax") {
+      if (mode !== "extend") input.action = mode === "image" ? "h3_i2v_generate" : "h3_t2v_generate";
+      delete input.loras;
+      input.lora = lora === "bounce_fl2va" ? "bounce_fl2va" : "none";
+      input.lora_strength = Number(lora_strength);
+      if (mode === "image") input.image = image;
+    }
+
     // 画像・動画は必要なモードでのみ送信する
-    if (mode === "image") input.image = image;
+    if (model === "h3" && mode === "image") input.image = image;
     if (mode === "extend") {
       input.video_url = await signDownload(video_key);
       input.extend_seconds = Number(extend_seconds);
@@ -249,7 +266,7 @@ export default async function handler(req, res) {
 
     try {
       runpodResponse = await fetch(
-        "https://api.runpod.ai/v2/18lt7ar99rsrfw/run",
+        `https://api.runpod.ai/v2/${model === "erosmax" && mode === "extend" ? "qdu7le19os7loq" : model === "erosmax" ? "2gdf5g88h8jsmm" : "18lt7ar99rsrfw"}/run`,
         {
           method: "POST",
           headers: {
@@ -297,6 +314,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       job_id: data.id,
+      model,
       status: data.status || "IN_QUEUE"
     });
   } catch (error) {

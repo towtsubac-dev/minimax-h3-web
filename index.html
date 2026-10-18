@@ -64,6 +64,8 @@
 <body>
   <h1>MiniMax H3 動画生成</h1>
 
+  <div class="section"><label for="modelSelect">生成モデル</label><select id="modelSelect"><option value="h3">MiniMax H3</option><option value="erosmax">Eros Max H3</option></select></div>
+
   <div class="section">
     <label>生成モード</label>
     <div class="mode-tabs" role="tablist" aria-label="生成モード">
@@ -82,6 +84,8 @@
       <option value="10">10秒</option>
     </select>
   </div>
+
+  <div class="section" id="erosLoraSection" style="display:none"><label for="erosLora">Eros Max LoRA</label><select id="erosLora"><option value="none">なし</option><option value="bounce_fl2va">Bounce FL2VA</option></select><div class="lora-strength"><label for="erosStrength">強度：<span id="erosStrengthValue">0.80</span></label><input type="range" id="erosStrength" min="0" max="2" step="0.05" value="0.8"></div></div>
 
   <div class="section" id="loraSection">
     <label>追加LoRA（複数選択可）</label>
@@ -139,7 +143,7 @@
     <select id="extendSeconds"><option value="3">3秒</option><option value="5">5秒</option><option value="8">8秒</option><option value="10">10秒</option></select>
     <label for="extendPassword">動画延長パスワード</label>
     <input id="extendPassword" type="password" autocomplete="off" placeholder="Vercelに設定したパスワード" style="width:100%;box-sizing:border-box;padding:12px;font-size:16px;margin-bottom:12px;">
-    <p class="info">20MiB以下のMP4動画（端末または生成履歴）に対応しています。動画は非公開のR2へ一時アップロードされます。</p>
+    <p class="info" id="extendHelp">20MiB以下のMP4動画（端末または生成履歴）に対応しています。動画は非公開のR2へ一時アップロードされます。</p>
     <button type="button" id="r2DiagnoseButton" style="margin-bottom:10px;">R2接続を診断</button>
     <div id="r2DiagnosticResult" class="info" style="display:none;"></div>
     <button type="button" id="extendSubmit">この動画を延長</button>
@@ -171,6 +175,22 @@ textModeTab.addEventListener("click", () => setMode("text"));
 extendModeTab.addEventListener("click", () => setMode("extend"));
 
 const durationSelect = document.getElementById("durationSelect");
+const modelSelect = document.getElementById("modelSelect");
+const erosLora = document.getElementById("erosLora");
+const erosStrength = document.getElementById("erosStrength");
+const erosStrengthValue = document.getElementById("erosStrengthValue");
+erosStrength.addEventListener("input",()=>{erosStrengthValue.textContent=Number(erosStrength.value).toFixed(2);});
+let h3Duration = durationSelect.value;
+modelSelect.addEventListener("change",()=>{
+  const eros=modelSelect.value==="erosmax";
+  document.getElementById("loraSection").style.display=eros?"none":"";
+  document.getElementById("erosLoraSection").style.display=eros?"":"none";
+  for(const option of durationSelect.options) option.disabled=eros&&option.value!=="5";
+  if(eros){h3Duration=durationSelect.value;durationSelect.value="5";}
+  else durationSelect.value=h3Duration;
+  extendModeTab.disabled=false;
+  updateModeUI();updateGenerateButton();
+});
 const loraControls = [
   { name:"hmnsfw", checkbox:document.getElementById("loraHmnsfw"), strength:document.getElementById("strengthHmnsfw"), value:document.getElementById("strengthHmnsfwValue") },
   { name:"free_pussy", checkbox:document.getElementById("loraFreePussy"), strength:document.getElementById("strengthFreePussy"), value:document.getElementById("strengthFreePussyValue") },
@@ -324,7 +344,7 @@ function formatJobTiming(statusData){
   return "\n\n"+lines.join("\n");
 }
 function updateGenerateButton(){const hasPrompt=promptInput.value.trim().length>0;if(extendBusy||currentMode==="extend"){generateButton.disabled=true;return;}if(currentMode==="image")generateButton.disabled=!originalImage||!hasPrompt;else generateButton.disabled=!hasPrompt;}
-function updateModeUI(){const isExtend=currentMode==="extend",isImageMode=currentMode==="image";imageSection.style.display=isImageMode?"block":"none";for(const id of ["durationSection","promptSection","generateSection"])document.getElementById(id).style.display=isExtend?"none":"block";document.getElementById("loraSection").style.display="block";extendSection.style.display=isExtend?"block":"none";if(!isImageMode)resolutionInfo.style.display="none";else if(originalImage)updateResolutionInfo();promptInput.placeholder=isImageMode?"画像からどのような動画にしたいか入力してください":"生成したい動画の場面や動きを入力してください";updateGenerateButton();}
+function updateModeUI(){const isExtend=currentMode==="extend",isImageMode=currentMode==="image";imageSection.style.display=isImageMode?"block":"none";for(const id of ["durationSection","promptSection","generateSection"])document.getElementById(id).style.display=isExtend?"none":"block";document.getElementById("loraSection").style.display=modelSelect.value==="erosmax"?"none":"block";document.getElementById("erosLoraSection").style.display=modelSelect.value==="erosmax"?"block":"none";extendModeTab.disabled=false;extendSection.style.display=isExtend?"block":"none";document.getElementById("extendSeconds").disabled=modelSelect.value==="erosmax";document.getElementById("extendSeconds").value=modelSelect.value==="erosmax"?"5":document.getElementById("extendSeconds").value;document.getElementById("extendPassword").style.display=modelSelect.value==="erosmax"?"none":"";document.querySelector("label[for=extendPassword]").style.display=modelSelect.value==="erosmax"?"none":"";document.getElementById("r2DiagnoseButton").style.display=modelSelect.value==="erosmax"?"none":"";document.getElementById("extendHelp").textContent=modelSelect.value==="erosmax"?"ErosMaxの動画コンテキスト延長（5秒）テストです。2.8MB以下のMP4を直接RunPodへ送信します。パスワード・R2設定は不要です。":"20MiB以下のMP4動画（端末または生成履歴）に対応しています。動画は非公開のR2へ一時アップロードされます。";if(!isImageMode)resolutionInfo.style.display="none";else if(originalImage)updateResolutionInfo();promptInput.placeholder=isImageMode?"画像からどのような動画にしたいか入力してください":"生成したい動画の場面や動きを入力してください";updateGenerateButton();}
 promptInput.addEventListener("input",updateGenerateButton);
 function calculateH3Resolution(){const BASE_SHORT_EDGE=768,MAX_PIXELS=768*1344,STEP=32;if(!naturalWidth||!naturalHeight)return{width:768,height:768};const aspectRatio=naturalWidth/naturalHeight;let width,height;if(aspectRatio>=1){height=BASE_SHORT_EDGE;width=height*aspectRatio;}else{width=BASE_SHORT_EDGE;height=width/aspectRatio;}if(width*height>MAX_PIXELS){const scale=Math.sqrt(MAX_PIXELS/(width*height));width*=scale;height*=scale;}width=Math.max(STEP,Math.round(width/STEP)*STEP);height=Math.max(STEP,Math.round(height/STEP)*STEP);while(width*height>MAX_PIXELS){if(width>=height)width-=STEP;else height-=STEP;}return{width,height};}
 async function prepareImageForH3(){if(!originalImage)throw new Error("画像が選択されていません。");const resolution=calculateH3Resolution();const canvas=document.createElement("canvas");canvas.width=resolution.width;canvas.height=resolution.height;const ctx=canvas.getContext("2d");if(!ctx)throw new Error("Canvasを取得できませんでした。");ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(originalImage,0,0,resolution.width,resolution.height);return{dataUrl:canvas.toDataURL("image/jpeg",0.92),width:resolution.width,height:resolution.height};}
@@ -333,28 +353,28 @@ imageInput.addEventListener("change",()=>{const file=imageInput.files?.[0];if(!f
 
 generateButton.addEventListener("click",async()=>{
   if(extendBusy)return;
-  const mode=currentMode,duration=Number(durationSelect.value),prompt=promptInput.value.trim(),selectedLoras=getSelectedLoras();
+  const mode=currentMode,duration=Number(durationSelect.value),prompt=promptInput.value.trim(),selectedLoras=getSelectedLoras(),model=modelSelect.value;
   if(!prompt){setStatus("プロンプトを入力してください。","error");return;}
   savePromptHistory(prompt);
   if(mode==="image"&&!originalImage){setStatus("画像を選択してください。","error");return;}
   generateButton.disabled=true;
-  const controlsToLock=[imageModeTab,textModeTab,extendModeTab,durationSelect,imageInput,promptInput,...loraControls.flatMap(c=>[c.checkbox,c.strength])];controlsToLock.forEach(c=>{c.disabled=true;});
+  const controlsToLock=[modelSelect,erosLora,erosStrength,imageModeTab,textModeTab,extendModeTab,durationSelect,imageInput,promptInput,...loraControls.flatMap(c=>[c.checkbox,c.strength])];controlsToLock.forEach(c=>{c.disabled=true;});
   videoElement.pause();videoElement.style.display="none";videoElement.removeAttribute("src");videoElement.load();downloadVideoButton.style.display="none";downloadVideoButton.removeAttribute("href");
   try{
     let imageData=null,width=768,height=768;
     if(mode==="image"){setStatus("画像をH3用の解像度に変換しています...");const prepared=await prepareImageForH3();imageData=prepared.dataUrl;width=prepared.width;height=prepared.height;}
     setStatus("動画生成を開始しています。\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さ: ${duration}秒\n`+`生成解像度: ${width} × ${height}`);
-    const requestBody={mode,duration,prompt,width,height,loras:selectedLoras};if(mode==="image")requestBody.image=imageData;
+    const requestBody={mode,duration,prompt,width,height,model,loras:selectedLoras};if(model==="erosmax"){requestBody.lora=erosLora.value;requestBody.lora_strength=Number(erosStrength.value);}if(mode==="image")requestBody.image=imageData;
     const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(requestBody)});const responseText=await response.text();let data;try{data=JSON.parse(responseText);}catch{throw new Error("サーバーからJSONではないレスポンスが返りました。\n"+`HTTP ${response.status}\n`+responseText.slice(0,500));}
     if(!response.ok)throw new Error(data.error||"動画生成ジョブの登録に失敗しました。");if(!data.job_id)throw new Error("RunPodのjob IDを取得できませんでした。");const jobId=data.job_id;
     setStatus("動画生成中です。\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さ: ${duration}秒\n`+`解像度: ${width} × ${height}\n`+`Job ID: ${jobId}`);
     const MAX_ATTEMPTS=180;let completed=false;
     for(let attempt=0;attempt<MAX_ATTEMPTS;attempt++){
       await new Promise(resolve=>setTimeout(resolve,5000));
-      const statusResponse=await fetch(`/api/status?job_id=${encodeURIComponent(jobId)}`);const statusText=await statusResponse.text();let statusData;try{statusData=JSON.parse(statusText);}catch{throw new Error("ステータスAPIからJSONではないレスポンスが返りました。\n"+`HTTP ${statusResponse.status}\n`+statusText.slice(0,500));}
+      const statusResponse=await fetch(`/api/status?job_id=${encodeURIComponent(jobId)}&model=${encodeURIComponent(model)}`);const statusText=await statusResponse.text();let statusData;try{statusData=JSON.parse(statusText);}catch{throw new Error("ステータスAPIからJSONではないレスポンスが返りました。\n"+`HTTP ${statusResponse.status}\n`+statusText.slice(0,500));}
       if(!statusResponse.ok)throw new Error(statusData.error||"ステータス取得に失敗しました。");console.log("RunPod status:",statusData);
       if(statusData.status==="COMPLETED"){
-        completed=true;const outputs=statusData.output?.outputs;if(!outputs||!outputs.length)throw new Error("生成完了しましたが、動画データが見つかりません。");const output=outputs[0];let videoBase64=output.video||output.data||output;if(typeof videoBase64!=="string")throw new Error("動画データの形式を認識できません。");videoElement.src=videoBase64.startsWith("data:")?videoBase64:`data:video/mp4;base64,${videoBase64}`;videoElement.style.display="block";downloadVideoButton.href=videoElement.src;downloadVideoButton.download=`minimax-h3-${mode}-${duration}s-${new Date().toISOString().replace(/[:.]/g,"-")}.mp4`;downloadVideoButton.style.display="block";
+        completed=true;if(statusData.output?.status==="error")throw new Error(statusData.output.error||"RunPodの動画生成処理でエラーが発生しました。");const outputs=statusData.output?.outputs;if(!outputs||!outputs.length)throw new Error("生成完了しましたが、動画データが見つかりません。");const output=outputs[0];let videoBase64=output.video||output.data||output;if(typeof videoBase64!=="string")throw new Error("動画データの形式を認識できません。");videoElement.src=videoBase64.startsWith("data:")?videoBase64:`data:video/mp4;base64,${videoBase64}`;videoElement.style.display="block";downloadVideoButton.href=videoElement.src;downloadVideoButton.download=`minimax-h3-${mode}-${duration}s-${new Date().toISOString().replace(/[:.]/g,"-")}.mp4`;downloadVideoButton.style.display="block";
         let historySaveWarning="";try{await storeGeneratedVideo(videoElement.src,{mode,duration,prompt,width,height});}catch(historyError){console.error("Could not save video history:",historyError);historySaveWarning="\n\n注意：履歴への保存に失敗しました。動画は上のボタンから保存できます。";}
         setStatus("動画生成が完了しました。"+historySaveWarning+"\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さの設定: ${duration}秒\n`+`生成解像度: ${width} × ${height}`+formatJobTiming(statusData),"success");break;
       }
@@ -388,17 +408,112 @@ document.getElementById("r2DiagnoseButton").addEventListener("click",async()=>{
   catch(error){result.textContent="診断APIへの通信エラー: "+error.message;}
   finally{button.disabled=false;}
 });
+// ErosMax: extract the last decodable video frame locally; never upload the source MP4.
+async function extractLastFrame(blob){
+  const url=URL.createObjectURL(blob), player=document.createElement("video");
+  player.preload="auto";player.muted=true;player.playsInline=true;
+  try{
+    await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(new Error("動画の読み込みがタイムアウトしました。")),30000);
+      player.onloadedmetadata=()=>{clearTimeout(timer);resolve();};
+      player.onerror=()=>{clearTimeout(timer);reject(new Error("このMP4をブラウザで再生できません。"));};
+      player.src=url;player.load();
+    });
+    if(!Number.isFinite(player.duration)||player.duration<=0||!player.videoWidth||!player.videoHeight)throw new Error("動画の長さまたは解像度を取得できません。");
+    const target=Math.max(0,player.duration-Math.min(0.08,player.duration/2));
+    await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(new Error("最終フレームの取得がタイムアウトしました。")),30000);
+      player.onseeked=()=>{clearTimeout(timer);resolve();};
+      player.onerror=()=>{clearTimeout(timer);reject(new Error("最終フレームに移動できません。"));};
+      player.currentTime=target;
+    });
+    const canvas=document.createElement("canvas");canvas.width=player.videoWidth;canvas.height=player.videoHeight;
+    const context=canvas.getContext("2d");if(!context)throw new Error("Canvasを使用できません。");
+    context.drawImage(player,0,0,canvas.width,canvas.height);
+    return {image:canvas.toDataURL("image/jpeg",0.92),width:canvas.width,height:canvas.height};
+  }finally{player.removeAttribute("src");player.load();URL.revokeObjectURL(url);}
+}
+async function extendErosMax(saved,prompt){
+  setStatus("元動画の最終フレームを抽出しています...");
+  const frame=await extractLastFrame(saved.blob);
+  setStatus("ErosMaxで続きの5秒を生成しています...");
+  const request={model:"erosmax",mode:"image",duration:5,prompt,image:frame.image,width:frame.width,height:frame.height,lora:erosLora.value,lora_strength:Number(erosStrength.value)};
+  const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(request)});
+  const data=await response.json();if(!response.ok||!data.job_id)throw new Error(data.error||"ErosMaxジョブを開始できませんでした。");
+  for(let attempt=0;attempt<180;attempt++){
+    await new Promise(resolve=>setTimeout(resolve,5000));
+    const result=await fetch("/api/status?job_id="+encodeURIComponent(data.job_id)+"&model=erosmax");
+    const statusData=await result.json();if(!result.ok)throw new Error(statusData.error||"ジョブ状態を取得できません。");
+    if(statusData.status==="COMPLETED"){
+      if(statusData.output?.status==="error")throw new Error(statusData.output.error||"ErosMax生成エラー");
+      const output=statusData.output?.outputs?.[0], encoded=output?.video||output?.data||output;
+      if(typeof encoded!=="string"||!encoded)throw new Error("生成動画データがありません。");
+      const dataUrl=encoded.startsWith("data:")?encoded:"data:video/mp4;base64,"+encoded;
+      const videoBlob=await (await fetch(dataUrl)).blob();
+      const createdAt=Date.now(),filename="erosmax-continuation-5s-"+new Date(createdAt).toISOString().replace(/[:.]/g,"-")+".mp4";
+      let warning="";
+      try{await saveHistoryItem({id:createdAt+"-"+Math.random().toString(36).slice(2),createdAt,filename,blob:videoBlob,mode:"extend",duration:5,prompt,width:frame.width,height:frame.height});await renderHistory();}
+      catch(error){console.error("History save failed:",error);warning=" 履歴への保存には失敗しました。";}
+      if(currentVideoObjectUrl)URL.revokeObjectURL(currentVideoObjectUrl);
+      currentVideoObjectUrl=URL.createObjectURL(videoBlob);videoElement.src=currentVideoObjectUrl;videoElement.style.display="block";
+      downloadVideoButton.href=currentVideoObjectUrl;downloadVideoButton.download=filename;downloadVideoButton.style.display="block";
+      setStatus("ErosMaxの続き5秒を生成しました。元動画とは未結合です。"+warning+formatJobTiming(statusData),"success");
+      videoElement.scrollIntoView({behavior:"smooth",block:"start"});return;
+    }
+    if(["FAILED","CANCELLED"].includes(statusData.status))throw new Error(statusData.error||statusData.output?.error||"ErosMaxジョブが失敗しました。");
+    setStatus("ErosMaxで続きの5秒を生成中...\n状態: "+statusData.status+"\n確認: "+(attempt+1)+"/180");
+  }
+  throw new Error("15分以内に動画生成が完了しませんでした。");
+}
+
+async function extendErosContextDirect(saved,prompt){
+  if(saved.blob.size>2800000)throw new Error("テスト用の直接送信はMP4が2.8MB以下の場合のみ対応します。");
+  setStatus("MP4をRunPodテスト用Endpointに送信しています...");
+  const video=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result).split(",").pop());
+    reader.onerror=()=>reject(new Error("MP4を読み込めませんでした。"));
+    reader.readAsDataURL(saved.blob);
+  });
+  const response=await fetch("/api/eros-context-test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({video,prompt,extend_seconds:5})});
+  const data=await response.json();
+  if(!response.ok||!data.job_id)throw new Error(data.error||"テストジョブ登録に失敗しました。");
+  for(let attempt=0;attempt<180;attempt++){
+    await new Promise(resolve=>setTimeout(resolve,5000));
+    const result=await fetch("/api/status?job_id="+encodeURIComponent(data.job_id)+"&model=erosmax_extend");
+    const statusData=await result.json();
+    if(!result.ok)throw new Error(statusData.error||"ジョブ状態を取得できません。");
+    if(statusData.status==="COMPLETED"){
+      if(statusData.output?.status==="error")throw new Error(statusData.output.error||"RunPodでエラーが発生しました。");
+      const output=statusData.output?.outputs?.[0];
+      const encoded=output?.data||output?.video;
+      if(typeof encoded!=="string"||!encoded)throw new Error("延長後のMP4データがありません。");
+      const blob=await(await fetch(encoded.startsWith("data:")?encoded:"data:video/mp4;base64,"+encoded)).blob();
+      const createdAt=Date.now(),filename="erosmax-context-extended-"+createdAt+".mp4";
+      try{await saveHistoryItem({id:createdAt+"-"+Math.random().toString(36).slice(2),createdAt,filename,blob,mode:"extend",duration:(saved.duration||0)+5,prompt,width:saved.width,height:saved.height});await renderHistory();}catch(error){console.warn("History save failed:",error);}
+      if(currentVideoObjectUrl)URL.revokeObjectURL(currentVideoObjectUrl);
+      currentVideoObjectUrl=URL.createObjectURL(blob);videoElement.src=currentVideoObjectUrl;videoElement.style.display="block";
+      downloadVideoButton.href=currentVideoObjectUrl;downloadVideoButton.download=filename;downloadVideoButton.style.display="block";
+      setStatus("動画コンテキスト延長が完了しました。"+formatJobTiming(statusData),"success");
+      videoElement.scrollIntoView({behavior:"smooth",block:"start"});return;
+    }
+    if(["FAILED","CANCELLED"].includes(statusData.status))throw new Error(statusData.error||statusData.output?.error||"RunPod動画延長が失敗しました。");
+    setStatus("ErosMax動画コンテキスト延長を実行中...\nJob ID: "+data.job_id+"\n状態: "+statusData.status);
+  }
+  throw new Error("15分以内に動画生成が完了しませんでした。");
+}
 extendSubmit.addEventListener("click",async()=>{
   if(extendBusy)return;
   const prompt=extendPrompt.value.trim(),seconds=Number(extendSeconds.value),sourceId=extendSourceId;
   if(!prompt){setStatus("延長用プロンプトを入力してください。","error");return;}
-  if(![3,5,8,10].includes(seconds)){setStatus("延長時間が不正です。","error");return;}
+  if(modelSelect.value==="erosmax"?seconds!==5:![3,5,8,10].includes(seconds)){setStatus("延長時間が不正です。","error");return;}
   extendBusy=true;extendSubmit.disabled=true;extendCancel.disabled=true;extendLocalFile.disabled=true;imageModeTab.disabled=true;textModeTab.disabled=true;extendModeTab.disabled=true;updateGenerateButton();
   try{
     let saved;
     if(sourceId){saved=await getHistoryItem(sourceId);if(!saved||!(saved.blob instanceof Blob))throw new Error("元動画が履歴に見つかりません。");}
     else {const file=extendLocalFile.files?.[0];if(!file)throw new Error("延長するMP4動画を選択してください。");if(!/\.mp4$/i.test(file.name)||file.type&&file.type!=="video/mp4")throw new Error("MP4ファイルを選択してください。");saved={blob:file,filename:file.name,mode:"local",duration:0,width:0,height:0};}
     if(saved.blob.size<=0||saved.blob.size>20*1024*1024)throw new Error("動画は20MiB以下のMP4を選択してください。");
+    if(modelSelect.value==="erosmax"){await extendErosContextDirect(saved,prompt);return;}
     const password=extendPassword.value;
     if(!password)throw new Error("動画延長パスワードを入力してください。");
     setStatus("R2へのアップロードを準備しています...");
@@ -409,14 +524,14 @@ extendSubmit.addEventListener("click",async()=>{
     let uploadResponse;try{uploadResponse=await fetch(signingData.upload_url,{method:"PUT",headers:{"Content-Type":"video/mp4"},body:saved.blob});}catch(uploadError){throw new Error("Cloudflare Workerへのアップロード通信に失敗しました（ブラウザ: "+uploadError.message+"）。");}
     if(!uploadResponse.ok)throw new Error("Cloudflare Workerへの動画アップロードに失敗しました。HTTP "+uploadResponse.status);
     setStatus("動画延長を開始しています...");
-    const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"extend",prompt,extend_seconds:seconds,video_key:signingData.key,upload_password:password,loras:getSelectedLoras()})});
+    const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:modelSelect.value,mode:"extend",prompt,extend_seconds:seconds,video_key:signingData.key,upload_password:password,loras:modelSelect.value==="erosmax"?[]:getSelectedLoras()})});
     const data=await response.json();
     if(!response.ok||!data.job_id)throw new Error(data.error||"延長ジョブを開始できませんでした。");
     const jobId=data.job_id;
     let completed=false;
     for(let attempt=0;attempt<180;attempt++){
       await new Promise(resolve=>setTimeout(resolve,5000));
-      const result=await fetch("/api/status?job_id="+encodeURIComponent(jobId));
+      const result=await fetch("/api/status?job_id="+encodeURIComponent(jobId)+"&model="+(modelSelect.value==="erosmax"?"erosmax_extend":"h3"));
       const statusData=await result.json();
       if(!result.ok)throw new Error(statusData.error||"状態を確認できませんでした。");
       if(statusData.status==="COMPLETED"){
