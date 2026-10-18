@@ -1,4 +1,4 @@
-import { verifyPassword, validObjectKey, signDownload } from "./_r2.js";
+import { verifyPassword, validObjectKey, signDownload, uploadErosImage } from "./_r2.js";
 export default async function handler(req, res) {
   console.log("STEP 1: generate.js started");
 
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     if (!["h3", "erosmax"].includes(model)) return res.status(400).json({ error: "モデル指定が不正です。" });
     if (model === "erosmax" && mode === "extend") return res.status(400).json({ error: "Eros Maxの動画延長には未対応です。" });
     if (model === "erosmax" && ![5].includes(Number(duration))) return res.status(400).json({ error: "Eros Maxは現在5秒のみ対応しています。" });
-    if (model === "erosmax" && mode === "image" && (!image_url || typeof image_url !== "string" || !image_url.startsWith("https://"))) return res.status(400).json({ error: "Eros Max用の画像URLが必要です。" });
+    if (model === "erosmax" && mode === "image" && !image) return res.status(400).json({ error: "Eros Max用の画像がありません。" });
     if (model === "erosmax" && (!Number.isFinite(Number(lora_strength)) || Number(lora_strength) < 0 || Number(lora_strength) > 2)) return res.status(400).json({ error: "Eros MaxのLoRA強度が不正です。" });
 
     // 秒数からH3のフレーム数へ変換
@@ -228,7 +228,7 @@ export default async function handler(req, res) {
       delete input.loras;
       input.lora = lora === "bounce_fl2va" ? "bounce_fl2va" : "none";
       input.lora_strength = Number(lora_strength);
-      if (mode === "image") input.image_url = image_url;
+      if (mode === "image") input.image_url = await uploadErosImage(image);
     }
 
     // 画像・動画は必要なモードでのみ送信する
