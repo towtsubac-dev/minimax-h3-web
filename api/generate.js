@@ -1,4 +1,4 @@
-import { verifyPassword, validObjectKey, signDownload, uploadErosImage } from "./_r2.js";
+import { verifyPassword, validObjectKey, signDownload } from "./_r2.js";
 export default async function handler(req, res) {
   console.log("STEP 1: generate.js started");
 
@@ -228,7 +228,7 @@ export default async function handler(req, res) {
       delete input.loras;
       input.lora = lora === "bounce_fl2va" ? "bounce_fl2va" : "none";
       input.lora_strength = Number(lora_strength);
-      if (mode === "image") input.image_url = await uploadErosImage(image);
+      if (mode === "image") input.image = image;
     }
 
     // 画像・動画は必要なモードでのみ送信する
