@@ -513,7 +513,7 @@ extendSubmit.addEventListener("click",async()=>{
     if(sourceId){saved=await getHistoryItem(sourceId);if(!saved||!(saved.blob instanceof Blob))throw new Error("元動画が履歴に見つかりません。");}
     else {const file=extendLocalFile.files?.[0];if(!file)throw new Error("延長するMP4動画を選択してください。");if(!/\.mp4$/i.test(file.name)||file.type&&file.type!=="video/mp4")throw new Error("MP4ファイルを選択してください。");saved={blob:file,filename:file.name,mode:"local",duration:0,width:0,height:0};}
     if(saved.blob.size<=0||saved.blob.size>20*1024*1024)throw new Error("動画は20MiB以下のMP4を選択してください。");
-    if(modelSelect.value==="erosmax"){await extendErosContextDirect(saved,prompt);return;}
+    if(modelSelect.value==="erosmax" && saved.blob.size<=2800000){await extendErosContextDirect(saved,prompt);return;}
     const password=extendPassword.value;
     if(!password)throw new Error("動画延長パスワードを入力してください。");
     setStatus("R2へのアップロードを準備しています...");
