@@ -8,6 +8,11 @@ module.exports = async function handler(req, res) {
   }
 
   const jobId = req.query?.job_id;
+  const model = req.query?.model || "h3";
+  const endpointIds = { h3: "18lt7ar99rsrfw", erosmax: "2gdf5g88h8jsmm" };
+  if (!Object.prototype.hasOwnProperty.call(endpointIds, model)) {
+    return res.status(400).json({ error: "モデル指定が不正です。" });
+  }
 
   console.log("STATUS 2: job_id:", jobId);
 
@@ -34,7 +39,7 @@ module.exports = async function handler(req, res) {
     console.log("STATUS 4: before RunPod fetch");
 
     const response = await fetch(
-      `https://api.runpod.ai/v2/18lt7ar99rsrfw/status/${encodeURIComponent(jobId)}`,
+      `https://api.runpod.ai/v2/${endpointIds[model]}/status/${encodeURIComponent(jobId)}`,
       {
         method: "GET",
         headers: {
