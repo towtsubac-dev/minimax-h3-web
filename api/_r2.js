@@ -1,6 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { timingSafeEqual } from "node:crypto";
+import { timingSafeEqual, randomUUID } from "node:crypto";
 
 export const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 const BUCKET = process.env.R2_BUCKET_NAME;
@@ -33,4 +33,21 @@ export async function diagnoseR2() {
   } catch(error) {
     return {ok:false,status:error.$metadata?.httpStatusCode||null,code:error.name||"Unknown",message:String(error.message||"").slice(0,180)};
   }
+}
+
+export async function uploadErosImage(dataUrl) {
+  if (typeof dataUrl !== "string") throw new Error("画像データがありません。");
+  const match = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl);
+  if (!match) throw new Error("JPEG・PNG・WebP形式の画像を指定してください。");
+  const base64 = match[2];
+  if (base64.length > Math.ceil(8 * 1024 * 1024 * 4 / 3) + 4) throw new Error("画像は8MiB以下にしてください。");
+  const bytes = Buffer.from(base64, "base64");
+  if (!bytes.length || bytes.length > 8 * 1024 * 1024 || bytes.toString("base64").replace(/=+$/, "") !== base64.replace(/=+$/, "")) throw new Error("画像データが不正です。");
+  const type = match[1];
+  const key = `eros-images/${randomUUID()}.${type === "jpeg" ? "jpg" : type}`;
+  const client = config();
+  await client.send(new PutObjectCommand({
+    Bucket: BUCKET, Key: key, Body: bytes, ContentType: `image/${type}`
+  }));
+  return getSignedUrl(client, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 3600 });
 }
