@@ -85,7 +85,11 @@
     </select>
   </div>
 
-  <div class="section" id="erosLoraSection" style="display:none"><label for="erosLora">Eros Max LoRA</label><select id="erosLora"><option value="none">なし</option><option value="bounce_fl2va">Bounce FL2VA</option></select><div class="lora-strength"><label for="erosStrength">強度：<span id="erosStrengthValue">0.80</span></label><input type="range" id="erosStrength" min="0" max="2" step="0.05" value="0.8"></div></div>
+  <div class="section" id="erosLoraSection" style="display:none">
+<label>Eros Max 追加LoRA（複数選択可・両方オフでなし）</label>
+<div class="lora-option"><label class="lora-check" for="erosBounce"><input type="checkbox" id="erosBounce">Bounce FL2VA</label><div class="lora-strength"><label for="erosBounceStrength">強度：<span id="erosBounceStrengthValue">0.80</span></label><input type="range" id="erosBounceStrength" min="0" max="2" step="0.05" value="0.8"></div></div>
+<div class="lora-option"><label class="lora-check" for="erosMystic"><input type="checkbox" id="erosMystic">Mystic XXX V4</label><div class="lora-strength"><label for="erosMysticStrength">強度：<span id="erosMysticStrengthValue">1.00</span></label><input type="range" id="erosMysticStrength" min="0" max="2" step="0.05" value="1"></div></div>
+</div>
 
   <div class="section" id="loraSection">
     <label>追加LoRA（複数選択可）</label>
@@ -176,10 +180,12 @@ extendModeTab.addEventListener("click", () => setMode("extend"));
 
 const durationSelect = document.getElementById("durationSelect");
 const modelSelect = document.getElementById("modelSelect");
-const erosLora = document.getElementById("erosLora");
-const erosStrength = document.getElementById("erosStrength");
-const erosStrengthValue = document.getElementById("erosStrengthValue");
-erosStrength.addEventListener("input",()=>{erosStrengthValue.textContent=Number(erosStrength.value).toFixed(2);});
+const erosLoraControls = [
+{name:"bounce_fl2va",checkbox:document.getElementById("erosBounce"),strength:document.getElementById("erosBounceStrength"),value:document.getElementById("erosBounceStrengthValue")},
+{name:"mystic_xxx_v4",checkbox:document.getElementById("erosMystic"),strength:document.getElementById("erosMysticStrength"),value:document.getElementById("erosMysticStrengthValue")}
+];
+function getSelectedErosLoras(){return erosLoraControls.filter(c=>c.checkbox.checked).map(c=>({name:c.name,strength:Number(c.strength.value)}));}
+for(const c of erosLoraControls)c.strength.addEventListener("input",()=>{c.value.textContent=Number(c.strength.value).toFixed(2);});
 let h3Duration = durationSelect.value;
 modelSelect.addEventListener("change",()=>{
   const eros=modelSelect.value==="erosmax";
@@ -358,13 +364,13 @@ generateButton.addEventListener("click",async()=>{
   savePromptHistory(prompt);
   if(mode==="image"&&!originalImage){setStatus("画像を選択してください。","error");return;}
   generateButton.disabled=true;
-  const controlsToLock=[modelSelect,erosLora,erosStrength,imageModeTab,textModeTab,extendModeTab,durationSelect,imageInput,promptInput,...loraControls.flatMap(c=>[c.checkbox,c.strength])];controlsToLock.forEach(c=>{c.disabled=true;});
+  const controlsToLock=[modelSelect,...erosLoraControls.flatMap(c=>[c.checkbox,c.strength]),imageModeTab,textModeTab,extendModeTab,durationSelect,imageInput,promptInput,...loraControls.flatMap(c=>[c.checkbox,c.strength])];controlsToLock.forEach(c=>{c.disabled=true;});
   videoElement.pause();videoElement.style.display="none";videoElement.removeAttribute("src");videoElement.load();downloadVideoButton.style.display="none";downloadVideoButton.removeAttribute("href");
   try{
     let imageData=null,width=768,height=768;
     if(mode==="image"){setStatus("画像をH3用の解像度に変換しています...");const prepared=await prepareImageForH3();imageData=prepared.dataUrl;width=prepared.width;height=prepared.height;}
     setStatus("動画生成を開始しています。\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さ: ${duration}秒\n`+`生成解像度: ${width} × ${height}`);
-    const requestBody={mode,duration,prompt,width,height,model,loras:selectedLoras};if(model==="erosmax"){requestBody.lora=erosLora.value;requestBody.lora_strength=Number(erosStrength.value);}if(mode==="image")requestBody.image=imageData;
+    const requestBody={mode,duration,prompt,width,height,model,loras:selectedLoras};if(model==="erosmax"){requestBody.loras=getSelectedErosLoras();}if(mode==="image")requestBody.image=imageData;
     const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(requestBody)});const responseText=await response.text();let data;try{data=JSON.parse(responseText);}catch{throw new Error("サーバーからJSONではないレスポンスが返りました。\n"+`HTTP ${response.status}\n`+responseText.slice(0,500));}
     if(!response.ok)throw new Error(data.error||"動画生成ジョブの登録に失敗しました。");if(!data.job_id)throw new Error("RunPodのjob IDを取得できませんでした。");const jobId=data.job_id;
     setStatus("動画生成中です。\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さ: ${duration}秒\n`+`解像度: ${width} × ${height}\n`+`Job ID: ${jobId}`);
@@ -437,7 +443,7 @@ async function extendErosMax(saved,prompt){
   setStatus("元動画の最終フレームを抽出しています...");
   const frame=await extractLastFrame(saved.blob);
   setStatus("ErosMaxで続きの5秒を生成しています...");
-  const request={model:"erosmax",mode:"image",duration:5,prompt,image:frame.image,width:frame.width,height:frame.height,lora:erosLora.value,lora_strength:Number(erosStrength.value)};
+  const request={model:"erosmax",mode:"image",duration:5,prompt,image:frame.image,width:frame.width,height:frame.height,loras:getSelectedErosLoras()};
   const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(request)});
   const data=await response.json();if(!response.ok||!data.job_id)throw new Error(data.error||"ErosMaxジョブを開始できませんでした。");
   for(let attempt=0;attempt<180;attempt++){

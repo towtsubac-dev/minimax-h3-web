@@ -53,24 +53,26 @@ export default async function handler(req, res) {
         lora && lora !== "none"
           ? [{
               name: lora,
-              strength: loraDefaults[lora]
+              strength: model === "erosmax" ? Number(lora_strength) : loraDefaults[lora]
             }]
           : [];
     }
 
-    if (model === "erosmax") requestedLoras = [];
+    // Preserve Eros Max LoRA selections.
     if (!Array.isArray(requestedLoras) || requestedLoras.length > 3) {
       return res.status(400).json({
         error: "追加LoRAの指定が不正です。"
       });
     }
 
+    const allowedLoras = model === "erosmax" ? {bounce_fl2va:0.8,mystic_xxx_v4:1.0} : loraDefaults;
+    if (requestedLoras.length > (model === "erosmax" ? 2 : 3)) return res.status(400).json({error:"追加LoRAの数が多すぎます。"});
     const normalizedLoras = [];
     const selectedLoraNames = new Set();
 
     for (const item of requestedLoras) {
       if (!item || typeof item !== "object" ||
-          !Object.prototype.hasOwnProperty.call(loraDefaults, item.name)) {
+          !Object.prototype.hasOwnProperty.call(allowedLoras, item.name)) {
         return res.status(400).json({
           error: "追加LoRAの指定が不正です。"
         });
@@ -85,10 +87,10 @@ export default async function handler(req, res) {
 
       const strength =
         item.strength === undefined
-          ? loraDefaults[item.name]
+          ? allowedLoras[item.name]
           : Number(item.strength);
 
-      if (!Number.isFinite(strength) || strength < 0 || strength > 1.5) {
+      if (!Number.isFinite(strength) || strength < 0 || strength > (model === "erosmax" ? 2 : 1.5)) {
         return res.status(400).json({
           error: "LoRA強度は0.0〜1.5の範囲で指定してください。"
         });
@@ -224,9 +226,7 @@ export default async function handler(req, res) {
 
     if (model === "erosmax") {
       if (mode !== "extend") input.action = mode === "image" ? "h3_i2v_generate" : "h3_t2v_generate";
-      delete input.loras;
-      input.lora = lora === "bounce_fl2va" ? "bounce_fl2va" : "none";
-      input.lora_strength = Number(lora_strength);
+      input.loras = normalizedLoras;
       if (mode === "image") input.image = image;
     }
 
