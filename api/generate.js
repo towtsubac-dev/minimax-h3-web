@@ -266,7 +266,7 @@ export default async function handler(req, res) {
 
     try {
       runpodResponse = await fetch(
-        `https://api.runpod.ai/v2/${model === "erosmax" ? "2gdf5g88h8jsmm" : "18lt7ar99rsrfw"}/run`,
+        `https://api.runpod.ai/v2/${model === "erosmax" ? "fywx9wjf8gnrmi" : "18lt7ar99rsrfw"}/run`,
         {
           method: "POST",
           headers: {
