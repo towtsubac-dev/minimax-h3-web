@@ -12,7 +12,7 @@ export default async function handler(req,res) {
     const controller=new AbortController();
     const timeout=setTimeout(()=>controller.abort(),30000);
     let response;
-    try { response=await fetch("https://api.runpod.ai/v2/fywx9wjf8gnrmi/run",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+apiKey},body:JSON.stringify({input:{action:"h3_extend_generate",prompt:prompt.trim(),extend_seconds:Number(extend_seconds),video}}),signal:controller.signal}); }
+    try { response=await fetch("https://api.runpod.ai/v2/2gdf5g88h8jsmm/run",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+apiKey},body:JSON.stringify({input:{action:"h3_extend_generate",prompt:prompt.trim(),extend_seconds:Number(extend_seconds),video}}),signal:controller.signal}); }
     finally {clearTimeout(timeout);}
     const data=await response.json();
     if(!response.ok||!data.id) return res.status(502).json({error:"RunPodジョブ登録に失敗しました。",details:data});
