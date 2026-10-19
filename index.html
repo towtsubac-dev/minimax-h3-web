@@ -506,7 +506,7 @@ extendSubmit.addEventListener("click",async()=>{
   if(extendBusy)return;
   const prompt=extendPrompt.value.trim(),seconds=Number(extendSeconds.value),sourceId=extendSourceId;
   if(!prompt){setStatus("延長用プロンプトを入力してください。","error");return;}
-  if(modelSelect.value==="erosmax"?seconds!==5:![3,5,8,10].includes(seconds)){setStatus("延長時間が不正です。","error");return;}
+  if(![3,5,8,10].includes(seconds)){setStatus("延長時間が不正です。","error");return;}
   extendBusy=true;extendSubmit.disabled=true;extendCancel.disabled=true;extendLocalFile.disabled=true;imageModeTab.disabled=true;textModeTab.disabled=true;extendModeTab.disabled=true;updateGenerateButton();
   try{
     let saved;
