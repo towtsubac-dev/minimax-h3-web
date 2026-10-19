@@ -5,14 +5,14 @@ export default async function handler(req,res) {
   const {video,prompt,extend_seconds}=req.body||{};
   if(typeof video!=="string"||!video||video.length>3900000||!/^[A-Za-z0-9+/]+={0,2}$/.test(video)) return res.status(413).json({error:"テスト用MP4は約2.8MiB以下にしてください。"});
   if(typeof prompt!=="string"||!prompt.trim()) return res.status(400).json({error:"プロンプトが必要です。"});
-  if(Number(extend_seconds)!==5) return res.status(400).json({error:"ErosMaxの延長は5秒のみです。"});
+  if(![3,5,8,10].includes(Number(extend_seconds))) return res.status(400).json({error:"ErosMaxの延長は3・5・8・10秒から選択してください。"});
   const apiKey=process.env.RUNPOD_API_KEY;
   if(!apiKey) return res.status(500).json({error:"RUNPOD_API_KEY is not configured."});
   try {
     const controller=new AbortController();
     const timeout=setTimeout(()=>controller.abort(),30000);
     let response;
-    try { response=await fetch("https://api.runpod.ai/v2/2gdf5g88h8jsmm/run",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+apiKey},body:JSON.stringify({input:{action:"h3_extend_generate",prompt:prompt.trim(),extend_seconds:5,video}}),signal:controller.signal}); }
+    try { response=await fetch("https://api.runpod.ai/v2/2gdf5g88h8jsmm/run",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+apiKey},body:JSON.stringify({input:{action:"h3_extend_generate",prompt:prompt.trim(),extend_seconds:Number(extend_seconds),video}}),signal:controller.signal}); }
     finally {clearTimeout(timeout);}
     const data=await response.json();
     if(!response.ok||!data.id) return res.status(502).json({error:"RunPodジョブ登録に失敗しました。",details:data});
