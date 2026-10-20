@@ -9,7 +9,8 @@ module.exports = async function handler(req, res) {
 
   const jobId = req.query?.job_id;
   const model = req.query?.model || "h3";
-  const endpointIds = { h3: "18lt7ar99rsrfw", erosmax: "2gdf5g88h8jsmm", erosmax_extend: "2gdf5g88h8jsmm" };
+  const erosEndpoint = process.env.VERCEL_ENV === "preview" && process.env.VERCEL_GIT_COMMIT_REF === "feature/eros-lora-library" ? "qdu7le19os7loq" : "2gdf5g88h8jsmm";
+  const endpointIds = { h3: "18lt7ar99rsrfw", erosmax: erosEndpoint, erosmax_extend: erosEndpoint };
   if (!Object.prototype.hasOwnProperty.call(endpointIds, model)) {
     return res.status(400).json({ error: "モデル指定が不正です。" });
   }
