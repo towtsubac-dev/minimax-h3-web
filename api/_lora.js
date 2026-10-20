@@ -43,14 +43,22 @@ export function validateLoraMetadata(data) {
   if (!Number.isSafeInteger(data.size) || data.size < 16 || data.size > MAX_LORA_BYTES) throw new Error("Invalid LoRA file size.");
   if (typeof data.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(data.sha256)) throw new Error("Invalid LoRA SHA256.");
   if (!["upload", "civitai"].includes(data.source)) throw new Error("Invalid LoRA source.");
-  return { id: data.id, name: data.name.trim(), size: data.size, sha256: data.sha256, source: data.source, created_at: data.created_at || new Date().toISOString() };
+  const compatible_models = data.compatible_models === undefined ? ["erosmax"] : data.compatible_models;
+  if (!Array.isArray(compatible_models) || compatible_models.length < 1 ||
+      compatible_models.length > 2 || new Set(compatible_models).size !== compatible_models.length ||
+      compatible_models.some(model => !["h3", "erosmax"].includes(model))) {
+    throw new Error("Invalid compatible models.");
+  }
+  return { id: data.id, name: data.name.trim(), size: data.size, sha256: data.sha256, source: data.source, created_at: data.created_at || new Date().toISOString(), compatible_models };
 }
 
 export async function readLora(id) {
   const { client, bucket } = loraStore();
   const { metadata } = loraKeys(id);
   const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: metadata }));
-  return JSON.parse(await result.Body.transformToString());
+  const entry = JSON.parse(await result.Body.transformToString());
+  // Legacy library entries are Eros Max-only until explicitly edited.
+  return { ...entry, compatible_models: entry.compatible_models ?? ["erosmax"] };
 }
 
 export async function listLoras() {
