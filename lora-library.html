@@ -8,6 +8,13 @@
 <label for="password">LoRA管理専用パスワード</label><input id="password" type="password" autocomplete="off">
 <button id="refresh" type="button">登録済みLoRAを確認</button><ul id="list"></ul>
 <hr>
+<h2>Civitaiのモデル情報</h2>
+<p>モデルバージョンIDまたはmodelVersionIdを含むURLを入力してください。現在は情報確認のみ対応しています。</p>
+<label for="civitai">Civitai URL / バージョンID</label>
+<input id="civitai" type="text" autocomplete="off" placeholder="例: 3258590">
+<button id="civitaiCheck" type="button">モデル情報を確認</button>
+<pre id="civitaiResult" role="status"></pre>
+<hr>
 <h2>スマホからLoRAをアップロード</h2>
 <label for="name">表示名</label><input id="name" maxlength="100" placeholder="LoRAの名前">
 <label for="file">.safetensorsファイル（最大2 GiB）</label><input id="file" type="file" accept=".safetensors">
@@ -17,6 +24,18 @@
 <small>通信が途切れた場合は再開せず最初からやり直します。分割アップロード中断時は可能な範囲で破棄します。</small>
 <script>
 const $ = id => document.getElementById(id);
+$("civitaiCheck").onclick=async()=>{
+  $("civitaiCheck").disabled=true;
+  $("civitaiResult").textContent="確認中...";
+  try {
+    const data=await api("lora-civitai-info",{urlOrId:$("civitai").value});
+    const lines=[data.modelName+" / "+data.versionName,"バージョンID: "+data.versionId];
+    for(const f of data.files||[])lines.push(f.name+" ("+(f.sizeKB/1024).toFixed(1)+" MiB)");
+    if(!data.files?.length)lines.push("対応するsafetensorsファイルがありません。");
+    $("civitaiResult").textContent=lines.join("\n");
+  } catch(error) { $("civitaiResult").textContent="確認失敗: "+error.message; }
+  finally { $("civitaiCheck").disabled=false; }
+};
 const api = async (route, fields) => {
   const response = await fetch("/api/"+route,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:$("password").value,...fields})});
   const data = await response.json().catch(()=>({}));
