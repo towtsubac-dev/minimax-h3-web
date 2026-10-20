@@ -1,17 +1,12 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Eros Max LoRA ライブラリ（準備中）</title>
+<title>Eros Max LoRA ライブラリ</title>
 <style>body{font-family:system-ui,sans-serif;max-width:680px;margin:auto;padding:18px;line-height:1.5}label{display:block;margin:14px 0 5px}input,button{box-sizing:border-box;width:100%;padding:12px;font-size:16px}button{margin-top:12px}progress{width:100%}pre{white-space:pre-wrap;overflow-wrap:anywhere}ul{padding-left:22px}small{color:#666}</style>
 </head><body>
 <p><a href="/">← 動画生成に戻る</a></p><h1>Eros Max LoRA ライブラリ</h1>
 <p>開発中の管理画面です。本番環境ではまだ利用できません。動画延長用パスワードとは別の専用パスワードを使用します。</p>
 <label for="password">LoRA管理専用パスワード</label><input id="password" type="password" autocomplete="off">
 <button id="refresh" type="button">登録済みLoRAを確認</button><ul id="list"></ul>
-<h2>RunPodテスト用JSON</h2>
-<p>登録済みLoRAを選び、テスト用RunPodに貼り付けるJSONを作成します。有効期限は10分です。URLには一時的なアクセス権が含まれるため公開しないでください。</p>
-<select id="testLora" style="width:100%;padding:12px"></select>
-<button id="testJson" type="button">テスト用JSONを作成してコピー</button>
-<pre id="testStatus" role="status"></pre>
 <hr>
 <h2>Civitaiのモデル情報</h2>
 <p>モデルバージョンIDまたはmodelVersionIdを含むURLを入力してください。情報を確認後、対象ファイルを選んでR2へ直接保存できます（最大256MiB、通信状況によって失敗する場合があります）。</p>
@@ -26,7 +21,7 @@
 <hr>
 <h2>スマホからLoRAをアップロード</h2>
 <label for="name">表示名</label><input id="name" maxlength="100" placeholder="LoRAの名前">
-<label for="file">.safetensorsファイル（最大2 GiB）</label><input id="file" type="file" accept=".safetensors">
+<label for="file">.safetensorsファイル（最大256 MiB）</label><input id="file" type="file" accept=".safetensors">
 <button id="upload" type="button">アップロードして検証・登録</button>
 <progress id="progress" value="0" max="100"></progress>
 <pre id="status" role="status"></pre>
@@ -73,35 +68,19 @@ $("refresh").onclick=async()=>{
   try {
     const data=await api("lora-list",{});
     $("list").replaceChildren();
-    $("testLora").replaceChildren();
     for(const lora of data.loras||[]){
       const li=document.createElement("li");
       li.textContent=lora.name+" ("+(lora.size/1048576).toFixed(1)+" MiB)";
       $("list").append(li);
-      const opt=document.createElement("option");opt.value=lora.id;opt.textContent=lora.name;$("testLora").append(opt);
     }
     if(!data.loras?.length)$("list").textContent="登録済みLoRAはありません。";
   }catch(error){$("list").textContent=error.message}
   finally{$("refresh").disabled=false}
 };
-$("testJson").onclick=async()=>{
-  $("testJson").disabled=true;
-  try{
-    const id=$("testLora").value;
-    if(!id)throw new Error("先に登録済みLoRAを確認してください。");
-    const entry=await api("lora-download-test",{id});
-    const payload=JSON.stringify({input:{action:"lora_download_test",registered:{
-      id:entry.id,sha256:entry.sha256,size:entry.size,url:entry.url
-    }}},null,2);
-    await navigator.clipboard.writeText(payload);
-    $("testStatus").textContent="コピーしました。10分以内にテスト用RunPodのRunへ貼り付けてください。";
-  }catch(error){$("testStatus").textContent="作成失敗: "+error.message}
-  finally{$("testJson").disabled=false}
-};
 $("upload").onclick=async()=>{
   const file=$("file").files?.[0], name=$("name").value.trim();
   if(!file||!file.name.toLowerCase().endsWith(".safetensors")||!name){$("status").textContent="表示名と.safetensorsファイルを指定してください。";return}
-  if(file.size<16||file.size>2*1024**3){$("status").textContent="対応サイズは16バイト以上2GiB以下です。";return}
+  if(file.size<16||file.size>256*1024**2){$("status").textContent="対応サイズは16バイト以上256MiB以下です。";return}
   $("upload").disabled=true;$("progress").value=0;
   let session;
   try{
