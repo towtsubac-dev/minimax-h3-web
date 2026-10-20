@@ -89,6 +89,9 @@
 <label>Eros Max 追加LoRA（複数選択可・両方オフでなし）</label>
 <div class="lora-option"><label class="lora-check" for="erosBounce"><input type="checkbox" id="erosBounce">Bounce FL2VA</label><div class="lora-strength"><label for="erosBounceStrength">強度：<span id="erosBounceStrengthValue">0.80</span></label><input type="range" id="erosBounceStrength" min="0" max="2" step="0.05" value="0.8"></div></div>
 <div class="lora-option"><label class="lora-check" for="erosMystic"><input type="checkbox" id="erosMystic">Mystic XXX V4</label><div class="lora-strength"><label for="erosMysticStrength">強度：<span id="erosMysticStrengthValue">1.00</span></label><input type="range" id="erosMysticStrength" min="0" max="2" step="0.05" value="1"></div></div>
+<div id="erosLibraryLoras"></div>
+<p id="erosLibraryStatus" style="font-size:0.85em"></p>
+<a href="/lora-library.html" target="_blank" rel="noopener noreferrer">LoRA管理画面</a>
 </div>
 
   <div class="section" id="loraSection">
@@ -185,6 +188,42 @@ const erosLoraControls = [
 {name:"mystic_xxx_v4",checkbox:document.getElementById("erosMystic"),strength:document.getElementById("erosMysticStrength"),value:document.getElementById("erosMysticStrengthValue")}
 ];
 function getSelectedErosLoras(){return erosLoraControls.filter(c=>c.checkbox.checked).map(c=>({name:c.name,strength:Number(c.strength.value)}));}
+async function loadErosLibraryLoras(){
+  const container=document.getElementById("erosLibraryLoras");
+  const status=document.getElementById("erosLibraryStatus");
+  status.textContent="登録LoRAを確認中...";
+  try{
+    const response=await fetch("/api/lora-options",{cache:"no-store"});
+    if(!response.ok)throw new Error("HTTP "+response.status);
+    const data=await response.json();
+    container.replaceChildren();
+    for(const entry of data.loras||[]){
+      if(!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(entry.id))continue;
+      const wrapper=document.createElement("div");
+      wrapper.className="lora-option";
+      const label=document.createElement("label");
+      label.className="lora-check";
+      const check=document.createElement("input");
+      check.type="checkbox";
+      label.append(check,document.createTextNode(" "+entry.name));
+      const strengthWrap=document.createElement("div");
+      strengthWrap.className="lora-strength";
+      const strengthLabel=document.createElement("label");
+      const value=document.createElement("span");
+      value.textContent="1.00";
+      strengthLabel.append(document.createTextNode("強度："),value);
+      const slider=document.createElement("input");
+      slider.type="range";slider.min="0";slider.max="2";slider.step="0.05";slider.value="1";
+      slider.addEventListener("input",()=>{value.textContent=Number(slider.value).toFixed(2);});
+      strengthWrap.append(strengthLabel,slider);
+      wrapper.append(label,strengthWrap);
+      container.append(wrapper);
+      erosLoraControls.push({name:"library:"+entry.id,checkbox:check,strength:slider,value});
+    }
+    status.textContent=(data.loras||[]).length?"登録済みLoRAを表示しました。":"登録済みLoRAはありません。";
+  }catch(error){status.textContent="登録LoRAの取得に失敗しました。";}
+}
+loadErosLibraryLoras();
 for(const c of erosLoraControls)c.strength.addEventListener("input",()=>{c.value.textContent=Number(c.strength.value).toFixed(2);});
 let h3Duration = durationSelect.value;
 modelSelect.addEventListener("change",()=>{
