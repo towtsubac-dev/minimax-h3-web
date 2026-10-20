@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Eros Max LoRA ライブラリ（準備中）</title>
+<style>body{font-family:system-ui,sans-serif;max-width:680px;margin:auto;padding:18px;line-height:1.5}label{display:block;margin:14px 0 5px}input,button{box-sizing:border-box;width:100%;padding:12px;font-size:16px}button{margin-top:12px}progress{width:100%}pre{white-space:pre-wrap;overflow-wrap:anywhere}ul{padding-left:22px}small{color:#666}</style>
+</head><body>
+<p><a href="/">← 動画生成に戻る</a></p><h1>Eros Max LoRA ライブラリ</h1>
+<p>開発中の管理画面です。本番環境ではまだ利用できません。動画延長用パスワードとは別の専用パスワードを使用します。</p>
+<label for="password">LoRA管理専用パスワード</label><input id="password" type="password" autocomplete="off">
+<button id="refresh" type="button">登録済みLoRAを確認</button><ul id="list"></ul>
+<hr>
+<h2>スマホからLoRAをアップロード</h2>
+<label for="name">表示名</label><input id="name" maxlength="100" placeholder="LoRAの名前">
+<label for="file">.safetensorsファイル（最大2 GiB）</label><input id="file" type="file" accept=".safetensors">
+<button id="upload" type="button">アップロードして検証・登録</button>
+<progress id="progress" value="0" max="100"></progress>
+<pre id="status" role="status"></pre>
+<small>通信が途切れた場合は再開せず最初からやり直します。分割アップロード中断時は可能な範囲で破棄します。</small>
+<script>
+const $ = id => document.getElementById(id);
+const api = async (route, fields) => {
+  const response = await fetch("/api/"+route,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:$("password").value,...fields})});
+  const data = await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.error || "API error: "+response.status);
+  return data;
+};
+$("refresh").onclick=async()=>{
+  $("refresh").disabled=true;
+  try {
+    const data=await api("lora-list",{});
+    $("list").replaceChildren();
+    for(const lora of data.loras||[]){
+      const li=document.createElement("li");
+      li.textContent=lora.name+" ("+(lora.size/1048576).toFixed(1)+" MiB)";
+      $("list").append(li);
+    }
+    if(!data.loras?.length)$("list").textContent="登録済みLoRAはありません。";
+  }catch(error){$("list").textContent=error.message}
+  finally{$("refresh").disabled=false}
+};
+$("upload").onclick=async()=>{
+  const file=$("file").files?.[0], name=$("name").value.trim();
+  if(!file||!file.name.toLowerCase().endsWith(".safetensors")||!name){$("status").textContent="表示名と.safetensorsファイルを指定してください。";return}
+  if(file.size<16||file.size>2*1024**3){$("status").textContent="対応サイズは16バイト以上2GiB以下です。";return}
+  $("upload").disabled=true;$("progress").value=0;
+  let session;
+  try{
+    session=await api("lora-upload-start",{name,size:file.size});
+    const parts=[];
+    const count=Math.ceil(file.size/session.partSize);
+    for(let i=0;i<count;i++){
+      $("status").textContent="アップロード中 "+(i+1)+"/"+count;
+      const signed=await api("lora-upload-part",{id:session.id,uploadId:session.uploadId,partNumber:i+1});
+      const blob=file.slice(i*session.partSize,Math.min((i+1)*session.partSize,file.size));
+      const response=await fetch(signed.url,{method:"PUT",body:blob});
+      if(!response.ok)throw new Error("R2 part "+(i+1)+" HTTP "+response.status);
+      const etag=response.headers.get("ETag");
+      if(!etag)throw new Error("R2のCORS設定でETagが公開されていません。");
+      parts.push({PartNumber:i+1,ETag:etag});
+      $("progress").value=Math.round((i+1)*100/count);
+    }
+    await api("lora-upload-finish",{id:session.id,uploadId:session.uploadId,size:file.size,parts});
+    $("status").textContent="アップロード完了。ファイルを検証しています...";
+    const result=await api("lora-register",{id:session.id,name});
+    $("status").textContent="登録完了: "+result.lora.name;
+    $("refresh").click();
+    session=null;
+  }catch(error){
+    $("status").textContent="失敗: "+error.message;
+    if(session)api("lora-upload-abort",{id:session.id,uploadId:session.uploadId}).catch(()=>{});
+  }finally{$("upload").disabled=false}
+};
+</script></body></html>
