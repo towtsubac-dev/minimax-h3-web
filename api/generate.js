@@ -286,7 +286,7 @@ export default async function handler(req, res) {
 
     try {
       runpodResponse = await fetch(
-        `https://api.runpod.ai/v2/${model === "erosmax" ? (process.env.VERCEL_ENV === "preview" && ["feature/eros-lora-library", "feature/r2-only-eros-loras"].includes(process.env.VERCEL_GIT_COMMIT_REF) ? "qdu7le19os7loq" : "2gdf5g88h8jsmm") : (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_GIT_COMMIT_REF === "feature/shared-h3-eros-lora-library" ? "h3uc7tx9jxa2vc" : "18lt7ar99rsrfw")}/run`,
+        `https://api.runpod.ai/v2/${model === "erosmax" ? (process.env.VERCEL_ENV === "preview" && ["feature/eros-lora-library", "feature/r2-only-eros-loras", "feature/shared-h3-eros-lora-library"].includes(process.env.VERCEL_GIT_COMMIT_REF) ? "qdu7le19os7loq" : "2gdf5g88h8jsmm") : (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_GIT_COMMIT_REF === "feature/shared-h3-eros-lora-library" ? "h3uc7tx9jxa2vc" : "18lt7ar99rsrfw")}/run`,
         {
           method: "POST",
           headers: {
