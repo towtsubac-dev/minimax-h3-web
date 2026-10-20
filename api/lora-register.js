@@ -6,7 +6,7 @@ const MAX_HEADER_BYTES = 16 * 1024 * 1024;
 const MAX_BYTES = 2 * 1024 ** 3;
 
 function inspectHeader(buffer) {
-  if (buffer.length < 9) throw new Error("Safetensors header is missing");
+  if (buffer.length < 8) throw new Error("Safetensors header is missing");
   const length = Number(buffer.readBigUInt64LE(0));
   if (!Number.isSafeInteger(length) || length < 2 || length > MAX_HEADER_BYTES) throw new Error("Invalid safetensors header length");
   if (buffer.length < length + 8) return { length, complete: false };
