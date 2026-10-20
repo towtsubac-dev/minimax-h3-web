@@ -9,11 +9,15 @@
 <button id="refresh" type="button">登録済みLoRAを確認</button><ul id="list"></ul>
 <hr>
 <h2>Civitaiのモデル情報</h2>
-<p>モデルバージョンIDまたはmodelVersionIdを含むURLを入力してください。現在は情報確認のみ対応しています。</p>
+<p>モデルバージョンIDまたはmodelVersionIdを含むURLを入力してください。情報を確認後、対象ファイルを選んでR2へ直接保存できます（最大256MiB、通信状況によって失敗する場合があります）。</p>
 <label for="civitai">Civitai URL / バージョンID</label>
 <input id="civitai" type="text" autocomplete="off" placeholder="例: 3258590">
 <button id="civitaiCheck" type="button">モデル情報を確認</button>
 <pre id="civitaiResult" role="status"></pre>
+<label for="civitaiFile">保存するファイル</label><select id="civitaiFile" style="width:100%;padding:12px"></select>
+<label for="civitaiName">ライブラリ表示名</label><input id="civitaiName" maxlength="100">
+<button id="civitaiImport" type="button" disabled>選択したLoRAをR2へ直接保存</button>
+<pre id="civitaiImportStatus" role="status"></pre>
 <hr>
 <h2>スマホからLoRAをアップロード</h2>
 <label for="name">表示名</label><input id="name" maxlength="100" placeholder="LoRAの名前">
@@ -25,6 +29,7 @@
 <script>
 const $ = id => document.getElementById(id);
 $("civitaiCheck").onclick=async()=>{
+  $("civitaiImport").disabled=true;
   $("civitaiCheck").disabled=true;
   $("civitaiResult").textContent="確認中...";
   try {
@@ -33,8 +38,24 @@ $("civitaiCheck").onclick=async()=>{
     for(const f of data.files||[])lines.push(f.name+" ("+(f.sizeKB/1024).toFixed(1)+" MiB)");
     if(!data.files?.length)lines.push("対応するsafetensorsファイルがありません。");
     $("civitaiResult").textContent=lines.join("\n");
+    $("civitaiFile").replaceChildren();
+    for(const f of data.files||[]){const opt=document.createElement("option");opt.value=f.name;opt.textContent=f.name;$("civitaiFile").append(opt)}
+    $("civitaiName").value=(data.modelName+" "+data.versionName).slice(0,100);
+    $("civitaiImport").disabled=!data.files?.length;
   } catch(error) { $("civitaiResult").textContent="確認失敗: "+error.message; }
   finally { $("civitaiCheck").disabled=false; }
+};
+$("civitaiImport").onclick=async()=>{
+  $("civitaiImport").disabled=true;
+  $("civitaiImportStatus").textContent="CivitaiからR2へ転送しています。完了までこの画面を閉じないでください...";
+  try {
+    const result=await api("lora-civitai-import",{
+      urlOrId:$("civitai").value,fileName:$("civitaiFile").value,name:$("civitaiName").value.trim()
+    });
+    $("civitaiImportStatus").textContent="登録完了: "+result.lora.name;
+    $("refresh").click();
+  }catch(error){$("civitaiImportStatus").textContent="直接保存に失敗: "+error.message}
+  finally{$("civitaiImport").disabled=false}
 };
 const api = async (route, fields) => {
   const response = await fetch("/api/lora?action="+encodeURIComponent(route.replace(/^lora-/,"")),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:$("password").value,...fields})});
