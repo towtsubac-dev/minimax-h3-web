@@ -299,6 +299,7 @@ async function route_lora_civitai_import(req, res) {
     const parts = [];
     const hasher = createHash("sha256");
     let size = 0, pending = Buffer.alloc(0), headerInfo;
+    let headerBytes = Buffer.alloc(0), headerLength = null;
     const partSize = 16 * 1024 * 1024;
     for await (const piece of response.body) {
       const chunk = Buffer.from(piece);
@@ -306,11 +307,20 @@ async function route_lora_civitai_import(req, res) {
       if (size > limit) throw new Error("File too large");
       hasher.update(chunk);
       pending = Buffer.concat([pending, chunk]);
-      if (!headerInfo && pending.length >= 8) {
-        const headerLength = Number(pending.readBigUInt64LE(0));
-        if (!Number.isSafeInteger(headerLength) || headerLength < 2 || headerLength > MAX_HEADER_BYTES)
-          throw new Error("Invalid safetensors header");
-        if (pending.length >= headerLength + 8) headerInfo = inspectHeader(pending);
+      if (!headerInfo) {
+        const take = Math.min(chunk.length, Math.max(0, (headerLength === null ? 8 : headerLength + 8) - headerBytes.length));
+        if (take) headerBytes = Buffer.concat([headerBytes, chunk.subarray(0, take)]);
+        if (headerLength === null && headerBytes.length === 8) {
+          headerLength = Number(headerBytes.readBigUInt64LE(0));
+          if (!Number.isSafeInteger(headerLength) || headerLength < 2 || headerLength > MAX_HEADER_BYTES)
+            throw new Error("Invalid safetensors header");
+        }
+        if (headerLength !== null && headerBytes.length < headerLength + 8) {
+          const extra = Math.min(chunk.length - take, headerLength + 8 - headerBytes.length);
+          if (extra > 0) headerBytes = Buffer.concat([headerBytes, chunk.subarray(take, take + extra)]);
+        }
+        if (headerLength !== null && headerBytes.length === headerLength + 8)
+          headerInfo = inspectHeader(headerBytes);
       }
       while (pending.length >= partSize) {
         const body = pending.subarray(0, partSize);
@@ -330,14 +340,12 @@ async function route_lora_civitai_import(req, res) {
       parts.push({ PartNumber: parts.length + 1, ETag: uploaded.ETag });
     }
     if (size < 16 || hasher.digest("hex") !== sha) throw new Error("SHA-256 mismatch");
-    // Verify the safetensors header and offsets from the first downloaded bytes.
-    // The header may span chunks, so the full structural check is performed below.
+    if (!headerInfo?.complete || headerInfo.tensorBytes !== size - 8 - headerInfo.length)
+      throw new Error("Invalid safetensors tensor layout");
     await client.send(new CompleteMultipartUploadCommand({
       Bucket: bucket, Key: key, UploadId: uploadId, MultipartUpload: { Parts: parts }
     }));
     completed = true;
-    const verified = await verifyObject(client, bucket, key);
-    if (verified.sha256 !== sha || verified.size !== size) throw new Error("Stored file mismatch");
     const entry = await saveLoraMetadata({ id, name, size, sha256: sha, source: "civitai" });
     return res.status(200).json({ lora: entry });
   } catch (error) {
