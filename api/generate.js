@@ -68,7 +68,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const allowedLoras = model === "erosmax" ? {bounce_fl2va:0.8,mystic_xxx_v4:1.0} : loraDefaults;
+    const allowedLoras = model === "erosmax" ? {} : loraDefaults;
     if (requestedLoras.length > (model === "erosmax" ? 2 : 3)) return res.status(400).json({error:"追加LoRAの数が多すぎます。"});
     const normalizedLoras = [];
     const selectedLoraNames = new Set();
