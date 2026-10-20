@@ -250,6 +250,110 @@ async function route_lora_civitai_info(req, res) {
 }
 
 
+
+async function route_lora_civitai_import(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!verifyLoraAdminPassword(req.body?.password)) return res.status(401).json({ error: "Unauthorized" });
+  const versionId = versionIdFromInput(req.body?.urlOrId);
+  const fileName = req.body?.fileName;
+  const name = req.body?.name;
+  if (!versionId || typeof fileName !== "string" || fileName.length > 250 ||
+      typeof name !== "string" || !name.trim() || name.length > 100)
+    return res.status(400).json({ error: "モデル・ファイル・表示名を確認してください。" });
+
+  // Bound transfers to 256 MiB; larger models need a separate long-running worker.
+  const limit = 256 * 1024 * 1024;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 115000);
+  let uploadId, client, bucket, key, completed = false;
+  try {
+    const auth = process.env.CIVITAI_API_TOKEN;
+    const headers = { Accept: "application/json" };
+    if (auth) headers.Authorization = "Bearer " + auth;
+    const metaResponse = await fetch("https://civitai.com/api/v1/model-versions/" + versionId, {
+      headers, signal: controller.signal
+    });
+    if (!metaResponse.ok) throw new Error("Civitai metadata HTTP " + metaResponse.status);
+    const info = await metaResponse.json();
+    const file = (Array.isArray(info.files) ? info.files : []).find(f =>
+      f.name === fileName && f.name.toLowerCase().endsWith(".safetensors"));
+    const sha = file?.hashes?.SHA256?.toLowerCase();
+    const sizeHint = Number(file?.sizeKB) * 1024;
+    if (!file || !/^[a-f0-9]{64}$/.test(sha) || !Number.isFinite(sizeHint) || sizeHint > limit)
+      return res.status(400).json({ error: "このファイルは直接保存に非対応です（SHA-256必須、最大256MiB）。" });
+    const downloadUrl = new URL(file.downloadUrl || "https://civitai.com/api/download/models/" + versionId);
+    if (downloadUrl.protocol !== "https:" || !["civitai.com", "www.civitai.com"].includes(downloadUrl.hostname))
+      throw new Error("Unexpected Civitai download host");
+    if (auth) downloadUrl.searchParams.set("token", auth);
+    const response = await fetch(downloadUrl, { signal: controller.signal });
+    if (!response.ok || !response.body) throw new Error("Civitai download HTTP " + response.status);
+    if (Number(response.headers.get("content-length")) > limit) throw new Error("File too large");
+    const id = randomUUID();
+    ({ client, bucket } = loraStore());
+    key = loraKeys(id).model;
+    const started = await client.send(new CreateMultipartUploadCommand({
+      Bucket: bucket, Key: key, ContentType: "application/octet-stream"
+    }));
+    uploadId = started.UploadId;
+    const parts = [];
+    const hasher = createHash("sha256");
+    let size = 0, pending = Buffer.alloc(0), headerInfo;
+    const partSize = 16 * 1024 * 1024;
+    for await (const piece of response.body) {
+      const chunk = Buffer.from(piece);
+      size += chunk.length;
+      if (size > limit) throw new Error("File too large");
+      hasher.update(chunk);
+      pending = Buffer.concat([pending, chunk]);
+      if (!headerInfo && pending.length >= 8) {
+        const headerLength = Number(pending.readBigUInt64LE(0));
+        if (!Number.isSafeInteger(headerLength) || headerLength < 2 || headerLength > MAX_HEADER_BYTES)
+          throw new Error("Invalid safetensors header");
+        if (pending.length >= headerLength + 8) headerInfo = inspectHeader(pending);
+      }
+      while (pending.length >= partSize) {
+        const body = pending.subarray(0, partSize);
+        const uploaded = await client.send(new UploadPartCommand({
+          Bucket: bucket, Key: key, UploadId: uploadId,
+          PartNumber: parts.length + 1, Body: body, ContentLength: body.length
+        }));
+        parts.push({ PartNumber: parts.length + 1, ETag: uploaded.ETag });
+        pending = pending.subarray(partSize);
+      }
+    }
+    if (pending.length) {
+      const uploaded = await client.send(new UploadPartCommand({
+        Bucket: bucket, Key: key, UploadId: uploadId,
+        PartNumber: parts.length + 1, Body: pending, ContentLength: pending.length
+      }));
+      parts.push({ PartNumber: parts.length + 1, ETag: uploaded.ETag });
+    }
+    if (size < 16 || hasher.digest("hex") !== sha) throw new Error("SHA-256 mismatch");
+    // Verify the safetensors header and offsets from the first downloaded bytes.
+    // The header may span chunks, so the full structural check is performed below.
+    await client.send(new CompleteMultipartUploadCommand({
+      Bucket: bucket, Key: key, UploadId: uploadId, MultipartUpload: { Parts: parts }
+    }));
+    completed = true;
+    const verified = await verifyObject(client, bucket, key);
+    if (verified.sha256 !== sha || verified.size !== size) throw new Error("Stored file mismatch");
+    const entry = await saveLoraMetadata({ id, name, size, sha256: sha, source: "civitai" });
+    return res.status(200).json({ lora: entry });
+  } catch (error) {
+    console.error("Civitai LoRA import failed:", error.message);
+    if (completed && client && bucket && key) {
+      try { await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })); } catch {}
+    }
+    return res.status(502).json({ error: "Civitaiからの直接保存に失敗しました。サイズ・公開状態・通信時間を確認してください。" });
+  } finally {
+    clearTimeout(timer);
+    if (uploadId && !completed && client && bucket && key) {
+      try { await client.send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId })); } catch {}
+    }
+  }
+}
+
 // lora-download-test
 
 
@@ -309,6 +413,7 @@ const routes = {
   "upload-abort": route_lora_upload_abort,
   "register": route_lora_register,
   "civitai-info": route_lora_civitai_info,
+  "civitai-import": route_lora_civitai_import,
   "download-test": route_lora_download_test,
   "options": route_lora_options,
 };
