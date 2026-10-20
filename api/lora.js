@@ -1,4 +1,4 @@
-import { verifyLoraAdminPassword, listLoras, loraStore, loraKeys, validLoraId, saveLoraMetadata, readLora } from "./_lora.js";
+import { verifyLoraAdminPassword, listLoras, loraStore, loraKeys, validLoraId, saveLoraMetadata, readLora, updateLoraModels } from "./_lora.js";
 import { randomUUID, createHash } from "node:crypto";
 import { CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, HeadObjectCommand, AbortMultipartUploadCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -17,6 +17,23 @@ async function route_lora_list(req, res) {
   } catch (error) {
     console.error("LoRA list failed:", error);
     return res.status(500).json({ error: "LoRA一覧を取得できませんでした。" });
+  }
+}
+
+
+// lora-models: update model visibility without copying or moving the safetensors file.
+async function route_lora_models(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!verifyLoraAdminPassword(req.body?.password)) {
+    return res.status(401).json({ error: "LoRA管理パスワードが違います。" });
+  }
+  try {
+    const entry = await updateLoraModels(req.body?.id, req.body?.compatible_models);
+    return res.status(200).json({ lora: entry });
+  } catch (error) {
+    console.error("LoRA model assignment failed:", error);
+    return res.status(400).json({ error: "対応モデルの更新に失敗しました。LoRA IDと指定内容を確認してください。" });
   }
 }
 
@@ -383,6 +400,7 @@ async function route_lora_options(req, res) {
 
 const routes = {
   "list": route_lora_list,
+  "models": route_lora_models,
   "upload-start": route_lora_upload_start,
   "upload-part": route_lora_upload_part,
   "upload-finish": route_lora_upload_finish,
