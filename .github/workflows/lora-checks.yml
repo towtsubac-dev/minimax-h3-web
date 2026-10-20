@@ -16,7 +16,5 @@ jobs:
           node-version: "22"
       - run: |
           node --check api/_lora.js
-          node --check api/lora-register.js
-          node --check api/lora-civitai-info.js
-          node --check api/lora-options.js
+          node --check api/lora.js
           node --check api/generate.js
