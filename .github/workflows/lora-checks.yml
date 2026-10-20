@@ -1,0 +1,22 @@
+name: LoRA frontend checks
+on:
+  push:
+    branches:
+      - feature/eros-lora-library
+  pull_request:
+    branches:
+      - main
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: |
+          node --check api/_lora.js
+          node --check api/lora-register.js
+          node --check api/lora-civitai-info.js
+          node --check api/lora-options.js
+          node --check api/generate.js
