@@ -32,7 +32,7 @@ async function route_lora_upload_start(req, res) {
   const name = req.body?.name, size = req.body?.size;
   if (typeof name !== "string" || !name.trim() || name.length > 100 ||
       !Number.isSafeInteger(size) || size < 16 || size > 256 * 1024 ** 2)
-    return res.status(400).json({ error: "Invalid LoRA name or size (max 2 GiB)" });
+    return res.status(400).json({ error: "Invalid LoRA name or size (max 256 MiB)" });
   try {
     const id = randomUUID(), key = loraKeys(id).model;
     const { client, bucket } = loraStore();
@@ -82,7 +82,7 @@ async function route_lora_upload_finish(req, res) {
   if (!verifyLoraAdminPassword(req.body?.password)) return res.status(401).json({ error: "Unauthorized" });
   const { id, uploadId, parts, size } = req.body || {};
   if (!validLoraId(id) || typeof uploadId !== "string" || !uploadId || uploadId.length > 1024 ||
-      !Number.isSafeInteger(size) || size < 16 || size > 2 * 1024 ** 3 ||
+      !Number.isSafeInteger(size) || size < 16 || size > 256 * 1024 ** 2 ||
       !Array.isArray(parts) || parts.length < 1 || parts.length > 128 ||
       parts.some((p, i) => !p || p.PartNumber !== i + 1 || typeof p.ETag !== "string" ||
         !/^"?[a-fA-F0-9]{32}"?$/.test(p.ETag)))
