@@ -43,23 +43,7 @@ export default async function handler(req, res) {
       10: 244
     };
 
-    const loraDefaults = {
-      hmnsfw: 0.7,
-      free_pussy: 1.0,
-      hmpenis: 1.0
-    };
-
-    // Keep compatibility with older clients that send a single "lora" value.
-    let requestedLoras = loras;
-    if (requestedLoras === undefined) {
-      requestedLoras =
-        lora && lora !== "none"
-          ? [{
-              name: lora,
-              strength: model === "erosmax" ? Number(lora_strength) : loraDefaults[lora]
-            }]
-          : [];
-    }
+    const requestedLoras = loras === undefined ? [] : loras;
 
     // Preserve Eros Max LoRA selections.
     if (!Array.isArray(requestedLoras) || requestedLoras.length > 3) {
@@ -68,14 +52,13 @@ export default async function handler(req, res) {
       });
     }
 
-    const allowedLoras = model === "erosmax" ? {} : loraDefaults;
     if (requestedLoras.length > (model === "erosmax" ? 2 : 3)) return res.status(400).json({error:"追加LoRAの数が多すぎます。"});
     const normalizedLoras = [];
     const selectedLoraNames = new Set();
 
     for (const item of requestedLoras) {
       if (!item || typeof item !== "object" ||
-          !(Object.prototype.hasOwnProperty.call(allowedLoras, item.name) || (typeof item.name === "string" && item.name.startsWith("library:") && validLoraId(item.name.slice(8))))) {
+          !((typeof item.name === "string" && item.name.startsWith("library:") && validLoraId(item.name.slice(8))))) {
         return res.status(400).json({
           error: "追加LoRAの指定が不正です。"
         });
@@ -90,7 +73,7 @@ export default async function handler(req, res) {
 
       const strength =
         item.strength === undefined
-          ? (allowedLoras[item.name] ?? 1.0)
+          ? 1.0
           : Number(item.strength);
 
       if (!Number.isFinite(strength) || strength < 0 || strength > (model === "erosmax" ? 2 : 1.5)) {
