@@ -75,7 +75,7 @@ export default async function handler(req, res) {
 
     for (const item of requestedLoras) {
       if (!item || typeof item !== "object" ||
-          !(Object.prototype.hasOwnProperty.call(allowedLoras, item.name) || (model === "erosmax" && typeof item.name === "string" && item.name.startsWith("library:") && validLoraId(item.name.slice(8))))) {
+          !(Object.prototype.hasOwnProperty.call(allowedLoras, item.name) || (typeof item.name === "string" && item.name.startsWith("library:") && validLoraId(item.name.slice(8))))) {
         return res.status(400).json({
           error: "追加LoRAの指定が不正です。"
         });
@@ -229,12 +229,17 @@ export default async function handler(req, res) {
 
     if (model === "erosmax") {
       if (mode !== "extend") input.action = mode === "image" ? "h3_i2v_generate" : "h3_t2v_generate";
-      input.loras = await Promise.all(normalizedLoras.map(async item => {
+      if (mode === "image") input.image = image;
+    }
+
+    input.loras = await Promise.all(normalizedLoras.map(async item => {
         if (!item.name.startsWith("library:")) return item;
         const id = item.name.slice(8);
         let entry;
         try { entry = await readLora(id); }
         catch { throw new Error("登録LoRAが見つかりません: " + id); }
+        if (!Array.isArray(entry.compatible_models) || !entry.compatible_models.includes(model))
+          throw new Error("選択したモデルに登録されていないLoRAです: " + id);
         if (entry.id !== id || !/^[a-f0-9]{64}$/.test(entry.sha256) ||
             !Number.isSafeInteger(entry.size) || entry.size < 16 || entry.size > 2 * 1024 ** 3)
           throw new Error("登録LoRAのメタデータが不正です。");
@@ -244,8 +249,6 @@ export default async function handler(req, res) {
         }), { expiresIn: 3600 });
         return { ...item, registered: { id, sha256: entry.sha256, size: entry.size, url } };
       }));
-      if (mode === "image") input.image = image;
-    }
 
     // 画像・動画は必要なモードでのみ送信する
     if (model === "h3" && mode === "image") input.image = image;
