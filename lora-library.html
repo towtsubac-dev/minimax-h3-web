@@ -37,7 +37,7 @@ $("civitaiCheck").onclick=async()=>{
   finally { $("civitaiCheck").disabled=false; }
 };
 const api = async (route, fields) => {
-  const response = await fetch("/api/"+route,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:$("password").value,...fields})});
+  const response = await fetch("/api/lora?action="+encodeURIComponent(route.replace(/^lora-/,"")),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:$("password").value,...fields})});
   const data = await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(data.error || "API error: "+response.status);
   return data;
