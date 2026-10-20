@@ -7,6 +7,11 @@
 <p>開発中の管理画面です。本番環境ではまだ利用できません。動画延長用パスワードとは別の専用パスワードを使用します。</p>
 <label for="password">LoRA管理専用パスワード</label><input id="password" type="password" autocomplete="off">
 <button id="refresh" type="button">登録済みLoRAを確認</button><ul id="list"></ul>
+<h2>RunPodテスト用JSON</h2>
+<p>登録済みLoRAを選び、テスト用RunPodに貼り付けるJSONを作成します。有効期限は10分です。URLには一時的なアクセス権が含まれるため公開しないでください。</p>
+<select id="testLora" style="width:100%;padding:12px"></select>
+<button id="testJson" type="button">テスト用JSONを作成してコピー</button>
+<pre id="testStatus" role="status"></pre>
 <hr>
 <h2>Civitaiのモデル情報</h2>
 <p>モデルバージョンIDまたはmodelVersionIdを含むURLを入力してください。情報を確認後、対象ファイルを選んでR2へ直接保存できます（最大256MiB、通信状況によって失敗する場合があります）。</p>
@@ -68,14 +73,30 @@ $("refresh").onclick=async()=>{
   try {
     const data=await api("lora-list",{});
     $("list").replaceChildren();
+    $("testLora").replaceChildren();
     for(const lora of data.loras||[]){
       const li=document.createElement("li");
       li.textContent=lora.name+" ("+(lora.size/1048576).toFixed(1)+" MiB)";
       $("list").append(li);
+      const opt=document.createElement("option");opt.value=lora.id;opt.textContent=lora.name;$("testLora").append(opt);
     }
     if(!data.loras?.length)$("list").textContent="登録済みLoRAはありません。";
   }catch(error){$("list").textContent=error.message}
   finally{$("refresh").disabled=false}
+};
+$("testJson").onclick=async()=>{
+  $("testJson").disabled=true;
+  try{
+    const id=$("testLora").value;
+    if(!id)throw new Error("先に登録済みLoRAを確認してください。");
+    const entry=await api("lora-download-test",{id});
+    const payload=JSON.stringify({input:{action:"lora_download_test",registered:{
+      id:entry.id,sha256:entry.sha256,size:entry.size,url:entry.url
+    }}},null,2);
+    await navigator.clipboard.writeText(payload);
+    $("testStatus").textContent="コピーしました。10分以内にテスト用RunPodのRunへ貼り付けてください。";
+  }catch(error){$("testStatus").textContent="作成失敗: "+error.message}
+  finally{$("testJson").disabled=false}
 };
 $("upload").onclick=async()=>{
   const file=$("file").files?.[0], name=$("name").value.trim();
