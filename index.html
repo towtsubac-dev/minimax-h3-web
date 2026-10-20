@@ -193,7 +193,7 @@ async function loadErosLibraryLoras(){
   const status=document.getElementById("erosLibraryStatus");
   status.textContent="登録LoRAを確認中...";
   try{
-    const response=await fetch("/api/lora-options",{cache:"no-store"});
+    const response=await fetch("/api/lora?action=options",{cache:"no-store"});
     if(!response.ok)throw new Error("HTTP "+response.status);
     const data=await response.json();
     container.replaceChildren();
