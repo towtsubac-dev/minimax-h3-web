@@ -31,7 +31,7 @@ async function route_lora_upload_start(req, res) {
   if (!verifyLoraAdminPassword(req.body?.password)) return res.status(401).json({ error: "Unauthorized" });
   const name = req.body?.name, size = req.body?.size;
   if (typeof name !== "string" || !name.trim() || name.length > 100 ||
-      !Number.isSafeInteger(size) || size < 16 || size > 2 * 1024 ** 3)
+      !Number.isSafeInteger(size) || size < 16 || size > 256 * 1024 ** 2)
     return res.status(400).json({ error: "Invalid LoRA name or size (max 2 GiB)" });
   try {
     const id = randomUUID(), key = loraKeys(id).model;
@@ -131,7 +131,7 @@ async function route_lora_upload_abort(req, res) {
 
 const MAX_HEADER_BYTES = 16 * 1024 * 1024;
 // Full-object hashing remains unsuitable for Vercel execution limits on multi-GB files.
-const MAX_BYTES = 2 * 1024 ** 3;
+const MAX_BYTES = 256 * 1024 ** 2;
 
 function inspectHeader(buffer) {
   if (buffer.length < 8) throw new Error("Safetensors header is missing");
@@ -362,38 +362,6 @@ async function route_lora_civitai_import(req, res) {
   }
 }
 
-// lora-download-test
-
-
-
-// Administrative test endpoint only. Do not pass admin passwords to RunPod.
-// Production generation must use server-side trusted LoRA IDs and issue
-// short-lived URLs at dispatch time, without exposing them in browser responses.
-async function route_lora_download_test(req, res) {
-  res.setHeader("Cache-Control", "no-store");
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  if (!verifyLoraAdminPassword(req.body?.password)) return res.status(401).json({ error: "Unauthorized" });
-  const id = req.body?.id;
-  if (!validLoraId(id)) return res.status(400).json({ error: "Invalid LoRA ID" });
-  try {
-    const entry = await readLora(id);
-    if (entry.id !== id || !/^[a-f0-9]{64}$/.test(entry.sha256) ||
-        !Number.isSafeInteger(entry.size) || entry.size < 16 || entry.size > 2 * 1024 ** 3)
-      return res.status(422).json({ error: "Invalid LoRA metadata" });
-    const { client, bucket } = loraStore();
-    const url = await getSignedUrl(client, new GetObjectCommand({
-      Bucket: bucket, Key: loraKeys(id).model
-    }), { expiresIn: 600 });
-    return res.status(200).json({ id, name: entry.name, size: entry.size, sha256: entry.sha256, url, expiresIn: 600 });
-  } catch (error) {
-    if (error?.name === "NoSuchKey" || error?.$metadata?.httpStatusCode === 404)
-      return res.status(404).json({ error: "LoRA not found" });
-    console.error("LoRA download signing failed", error);
-    return res.status(500).json({ error: "Could not create LoRA download URL" });
-  }
-}
-
-
 // lora-options
 
 // Read-only selection list. Never return storage keys, hashes, or signed URLs.
@@ -422,7 +390,6 @@ const routes = {
   "register": route_lora_register,
   "civitai-info": route_lora_civitai_info,
   "civitai-import": route_lora_civitai_import,
-  "download-test": route_lora_download_test,
   "options": route_lora_options,
 };
 export default async function handler(req, res) {
