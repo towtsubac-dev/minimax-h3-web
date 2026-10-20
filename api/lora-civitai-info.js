@@ -27,8 +27,8 @@ export default async function handler(req, res) {
     if (!response.ok) return res.status(502).json({ error: "Civitaiのモデル情報を取得できませんでした。HTTP " + response.status });
     const data = await response.json();
     const files = (Array.isArray(data.files) ? data.files : [])
-      .filter(f => typeof f.name === "string" && f.name.toLowerCase().endsWith(".safetensors") && Number.isSafeInteger(f.sizeKB) && f.sizeKB > 0)
-      .map(f => ({ name: f.name, sizeKB: f.sizeKB, sha256: typeof f.hashes?.SHA256 === "string" ? f.hashes.SHA256.toLowerCase() : null }));
+      .filter(f => typeof f.name === "string" && f.name.toLowerCase().endsWith(".safetensors") && Number.isFinite(Number(f.sizeKB)) && Number(f.sizeKB) > 0)
+      .map(f => ({ name: f.name, sizeKB: Number(f.sizeKB), sha256: typeof f.hashes?.SHA256 === "string" ? f.hashes.SHA256.toLowerCase() : null }));
     return res.status(200).json({ versionId: id, modelName: String(data.model?.name || "").slice(0, 120), versionName: String(data.name || "").slice(0, 120), files });
   } catch (error) {
     console.error("Civitai version lookup failed", error);
