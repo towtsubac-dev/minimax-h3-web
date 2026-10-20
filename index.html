@@ -86,9 +86,7 @@
   </div>
 
   <div class="section" id="erosLoraSection" style="display:none">
-<label>Eros Max 追加LoRA（複数選択可・両方オフでなし）</label>
-<div class="lora-option"><label class="lora-check" for="erosBounce"><input type="checkbox" id="erosBounce">Bounce FL2VA</label><div class="lora-strength"><label for="erosBounceStrength">強度：<span id="erosBounceStrengthValue">0.80</span></label><input type="range" id="erosBounceStrength" min="0" max="2" step="0.05" value="0.8"></div></div>
-<div class="lora-option"><label class="lora-check" for="erosMystic"><input type="checkbox" id="erosMystic">Mystic XXX V4</label><div class="lora-strength"><label for="erosMysticStrength">強度：<span id="erosMysticStrengthValue">1.00</span></label><input type="range" id="erosMysticStrength" min="0" max="2" step="0.05" value="1"></div></div>
+<label>Eros Max ライブラリLoRA（最大2つ・未選択でなし）</label>
 <div id="erosLibraryLoras"></div>
 <p id="erosLibraryStatus" style="font-size:0.85em"></p>
 <a href="/lora-library.html" target="_blank" rel="noopener noreferrer">LoRA管理画面</a>
@@ -183,10 +181,7 @@ extendModeTab.addEventListener("click", () => setMode("extend"));
 
 const durationSelect = document.getElementById("durationSelect");
 const modelSelect = document.getElementById("modelSelect");
-const erosLoraControls = [
-{name:"bounce_fl2va",checkbox:document.getElementById("erosBounce"),strength:document.getElementById("erosBounceStrength"),value:document.getElementById("erosBounceStrengthValue")},
-{name:"mystic_xxx_v4",checkbox:document.getElementById("erosMystic"),strength:document.getElementById("erosMysticStrength"),value:document.getElementById("erosMysticStrengthValue")}
-];
+const erosLoraControls = [];
 function getSelectedErosLoras(){return erosLoraControls.filter(c=>c.checkbox.checked).map(c=>({name:c.name,strength:Number(c.strength.value)}));}
 async function loadErosLibraryLoras(){
   const container=document.getElementById("erosLibraryLoras");
