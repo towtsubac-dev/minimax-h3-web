@@ -45,15 +45,15 @@ async function verifyObject(client, bucket, key) {
     if (bytes > MAX_BYTES) throw new Error("LoRA file exceeds limit");
     hash.update(chunk);
     if (!headerInfo?.complete) {
+      // Append only the header bytes needed; never buffer tensor payloads.
       const required = headerInfo ? headerInfo.length + 8 : 8;
-      const take = Math.min(chunk.length, Math.max(0, required - header.length));
-      header = Buffer.concat([header, chunk.subarray(0,take)]);
-      headerInfo = header.length >= 8 ? inspectHeader(header) : null;
+      const firstTake = Math.min(chunk.length, Math.max(0, required - header.length));
+      if (firstTake) header = Buffer.concat([header, chunk.subarray(0, firstTake)]);
+      if (header.length >= 8 && !headerInfo) headerInfo = inspectHeader(header);
       if (headerInfo && !headerInfo.complete) {
-        // Header may span multiple chunks; read at most the declared length.
-        const remainder = chunk.subarray(take);
-        const extra = Math.min(remainder.length, headerInfo.length + 8 - header.length);
-        if (extra) header = Buffer.concat([header, remainder.subarray(0,extra)]);
+        const needed = headerInfo.length + 8 - header.length;
+        const extra = Math.min(needed, chunk.length - firstTake);
+        if (extra > 0) header = Buffer.concat([header, chunk.subarray(firstTake, firstTake + extra)]);
         if (header.length >= headerInfo.length + 8) headerInfo = inspectHeader(header);
       }
     }
