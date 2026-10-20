@@ -90,6 +90,24 @@ export async function saveLoraMetadata(data) {
   return entry;
 }
 
+export async function updateLoraModels(id, compatible_models) {
+  if (!validLoraId(id)) throw new Error("Invalid LoRA id.");
+  if (!Array.isArray(compatible_models) || compatible_models.length < 1 ||
+      compatible_models.length > 2 || new Set(compatible_models).size !== compatible_models.length ||
+      compatible_models.some(model => !["h3", "erosmax"].includes(model))) {
+    throw new Error("Invalid compatible models.");
+  }
+  const existing = await readLora(id);
+  const updated = validateLoraMetadata({ ...existing, compatible_models });
+  const { client, bucket } = loraStore();
+  const { metadata } = loraKeys(id);
+  await client.send(new PutObjectCommand({
+    Bucket: bucket, Key: metadata, Body: JSON.stringify(updated),
+    ContentType: "application/json"
+  }));
+  return updated;
+}
+
 export async function deleteLora(id) {
   const { client, bucket } = loraStore();
   const { metadata, model } = loraKeys(id);
