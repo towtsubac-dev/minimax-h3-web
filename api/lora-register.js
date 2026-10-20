@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { verifyLoraAdminPassword, loraStore, loraKeys, saveLoraMetadata, validLoraId } from "./_lora.js";
 
-const MAX_HEADER_BYTES = 16 * 1024 * 1024;\n// Full-object hashing remains unsuitable for Vercel execution limits on multi-GB files.
+const MAX_HEADER_BYTES = 16 * 1024 * 1024;
+// Full-object hashing remains unsuitable for Vercel execution limits on multi-GB files.
 const MAX_BYTES = 2 * 1024 ** 3;
 
 function inspectHeader(buffer) {
