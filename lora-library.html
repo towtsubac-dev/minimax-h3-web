@@ -21,7 +21,7 @@
 <hr>
 <h2>スマホからLoRAをアップロード</h2>
 <label for="name">表示名</label><input id="name" maxlength="100" placeholder="LoRAの名前">
-<label for="file">.safetensorsファイル（最大256 MiB）</label><input id="file" type="file" accept=".safetensors">
+<label for="file">.safetensorsファイル（最大512 MiB）</label><input id="file" type="file" accept=".safetensors">
 <button id="upload" type="button">アップロードして検証・登録</button>
 <progress id="progress" value="0" max="100"></progress>
 <pre id="status" role="status"></pre>
@@ -113,7 +113,7 @@ $("refresh").onclick=async()=>{
 $("upload").onclick=async()=>{
   const file=$("file").files?.[0], name=$("name").value.trim();
   if(!file||!file.name.toLowerCase().endsWith(".safetensors")||!name){$("status").textContent="表示名と.safetensorsファイルを指定してください。";return}
-  if(file.size<16||file.size>256*1024**2){$("status").textContent="対応サイズは16バイト以上256MiB以下です。";return}
+  if(file.size<16||file.size>512*1024**2){$("status").textContent="対応サイズは16バイト以上512MiB以下です。";return}
   $("upload").disabled=true;$("progress").value=0;
   let session;
   try{
