@@ -1,4 +1,4 @@
-import { verifyLoraAdminPassword, listLoras, loraStore, loraKeys, validLoraId, saveLoraMetadata, readLora, updateLoraModels } from "./_lora.js";
+import { verifyLoraAdminPassword, listLoras, loraStore, loraKeys, validLoraId, deleteLora, saveLoraMetadata, readLora, updateLoraModels } from "./_lora.js";
 import { randomUUID, createHash } from "node:crypto";
 import { CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, HeadObjectCommand, AbortMultipartUploadCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -379,6 +379,24 @@ async function route_lora_civitai_import(req, res) {
   }
 }
 
+// lora-delete: authenticated, explicit per-item removal from the production library.
+async function route_lora_delete(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!verifyLoraAdminPassword(req.body?.password)) return res.status(401).json({ error: "Unauthorized" });
+  const id = req.body?.id;
+  if (!validLoraId(id)) return res.status(400).json({ error: "Invalid LoRA ID" });
+  try {
+    const entry = await readLora(id);
+    if (req.body?.confirmName !== entry.name) return res.status(409).json({ error: "LoRA name confirmation mismatch" });
+    await deleteLora(id);
+    return res.status(200).json({ ok: true, id });
+  } catch (error) {
+    console.error("LoRA deletion failed", error);
+    return res.status(500).json({ error: "本番LoRAの削除に失敗しました。" });
+  }
+}
+
 // lora-options
 
 // Read-only selection list. Never return storage keys, hashes, or signed URLs.
@@ -400,6 +418,7 @@ async function route_lora_options(req, res) {
 
 const routes = {
   "list": route_lora_list,
+  "delete": route_lora_delete,
   "models": route_lora_models,
   "upload-start": route_lora_upload_start,
   "upload-part": route_lora_upload_part,
