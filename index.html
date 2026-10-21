@@ -92,23 +92,11 @@
 <a href="/lora-library.html" target="_blank" rel="noopener noreferrer">LoRA管理画面</a>
 </div>
 
-  <div class="section" id="loraSection">
-    <label>追加LoRA（複数選択可）</label>
-    <div class="lora-option">
-      <label class="lora-check" for="loraHmnsfw"><input type="checkbox" id="loraHmnsfw" value="hmnsfw">HMNSFW AIO V2.5</label>
-      <div class="lora-strength"><label for="strengthHmnsfw">強度：<span id="strengthHmnsfwValue">0.70</span></label><input type="range" id="strengthHmnsfw" min="0" max="1.5" step="0.05" value="0.7"></div>
-    </div>
-    <div class="lora-option">
-      <label class="lora-check" for="loraFreePussy"><input type="checkbox" id="loraFreePussy" value="free_pussy">Free Pussy</label>
-      <div class="lora-strength"><label for="strengthFreePussy">強度：<span id="strengthFreePussyValue">1.00</span></label><input type="range" id="strengthFreePussy" min="0" max="1.5" step="0.05" value="1.0"></div>
-    </div>
-    <div class="lora-option">
-      <label class="lora-check" for="loraHmpenis"><input type="checkbox" id="loraHmpenis" value="hmpenis">HMPenis</label>
-      <div class="lora-strength"><label for="strengthHmpenis">強度：<span id="strengthHmpenisValue">1.00</span></label><input type="range" id="strengthHmpenis" min="0" max="1.5" step="0.05" value="1.0"></div>
-    </div>
-    <div class="info">チェックしたLoRAをすべて同時に適用します。強度は各LoRAごとに0.00〜1.50で調整できます。
-選択したLoRAのトリガーワードはプロンプトの先頭に自動追加されます。
-何も選択しない場合は、これまでどおりTurbo LoRAのみを使用します。</div>
+  <div class="section" id="h3LibrarySection">
+    <label>MiniMax H3 ライブラリLoRA</label>
+    <div id="h3LibraryLoras"></div>
+    <p id="h3LibraryStatus" style="font-size:0.85em"></p>
+    <a href="/lora-library.html" target="_blank" rel="noopener noreferrer">LoRA管理画面</a>
   </div>
 
   <div class="section" id="imageSection">
@@ -182,17 +170,29 @@ extendModeTab.addEventListener("click", () => setMode("extend"));
 const durationSelect = document.getElementById("durationSelect");
 const modelSelect = document.getElementById("modelSelect");
 const erosLoraControls = [];
+const h3LibraryControls = [];
+function getSelectedH3LibraryLoras(){return h3LibraryControls.filter(c=>c.checkbox.checked).map(c=>({name:c.name,strength:Number(c.strength.value)}));}
 function getSelectedErosLoras(){return erosLoraControls.filter(c=>c.checkbox.checked).map(c=>({name:c.name,strength:Number(c.strength.value)}));}
 async function loadErosLibraryLoras(){
   const container=document.getElementById("erosLibraryLoras");
   const status=document.getElementById("erosLibraryStatus");
+  const h3Container=document.getElementById("h3LibraryLoras");
+  const h3Status=document.getElementById("h3LibraryStatus");
   status.textContent="登録LoRAを確認中...";
   try{
     const response=await fetch("/api/lora?action=options",{cache:"no-store"});
     if(!response.ok)throw new Error("HTTP "+response.status);
     const data=await response.json();
     container.replaceChildren();
+    h3Container.replaceChildren();
+    erosLoraControls.length=0;
+    h3LibraryControls.length=0;
     for(const entry of data.loras||[]){
+      const compatible=entry.compatible_models||["erosmax"];
+      for(const target of ["erosmax","h3"]){
+      if(!compatible.includes(target))continue;
+      const targetContainer=target==="h3"?h3Container:container;
+      const targetControls=target==="h3"?h3LibraryControls:erosLoraControls;
       if(!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(entry.id))continue;
       const wrapper=document.createElement("div");
       wrapper.className="lora-option";
@@ -208,36 +208,31 @@ async function loadErosLibraryLoras(){
       value.textContent="1.00";
       strengthLabel.append(document.createTextNode("強度："),value);
       const slider=document.createElement("input");
-      slider.type="range";slider.min="0";slider.max="2";slider.step="0.05";slider.value="1";
+      slider.type="range";slider.min="0";slider.max=target==="h3"?"1.5":"2";slider.step="0.05";slider.value="1";
       slider.addEventListener("input",()=>{value.textContent=Number(slider.value).toFixed(2);});
       strengthWrap.append(strengthLabel,slider);
       wrapper.append(label,strengthWrap);
-      container.append(wrapper);
-      erosLoraControls.push({name:"library:"+entry.id,checkbox:check,strength:slider,value});
+      targetContainer.append(wrapper);
+      targetControls.push({name:"library:"+entry.id,checkbox:check,strength:slider,value});
+      }
     }
-    status.textContent=(data.loras||[]).length?"登録済みLoRAを表示しました。":"登録済みLoRAはありません。";
-  }catch(error){status.textContent="登録LoRAの取得に失敗しました。";}
+    status.textContent=erosLoraControls.length?"対応LoRAを表示しました。":"Eros Max対応LoRAはありません。";
+    h3Status.textContent=h3LibraryControls.length?"対応LoRAを表示しました。":"H3対応LoRAはありません。";
+  }catch(error){status.textContent="登録LoRAの取得に失敗しました。";h3Status.textContent="登録LoRAの取得に失敗しました。";}
 }
 loadErosLibraryLoras();
 for(const c of erosLoraControls)c.strength.addEventListener("input",()=>{c.value.textContent=Number(c.strength.value).toFixed(2);});
 let h3Duration = durationSelect.value;
 modelSelect.addEventListener("change",()=>{
   const eros=modelSelect.value==="erosmax";
-  document.getElementById("loraSection").style.display=eros?"none":"";
   document.getElementById("erosLoraSection").style.display=eros?"":"none";
+  document.getElementById("h3LibrarySection").style.display=eros?"none":"";
   for(const option of durationSelect.options) option.disabled=eros&&option.value!=="5";
   if(eros){h3Duration=durationSelect.value;durationSelect.value="5";}
   else durationSelect.value=h3Duration;
   extendModeTab.disabled=false;
   updateModeUI();updateGenerateButton();
 });
-const loraControls = [
-  { name:"hmnsfw", checkbox:document.getElementById("loraHmnsfw"), strength:document.getElementById("strengthHmnsfw"), value:document.getElementById("strengthHmnsfwValue") },
-  { name:"free_pussy", checkbox:document.getElementById("loraFreePussy"), strength:document.getElementById("strengthFreePussy"), value:document.getElementById("strengthFreePussyValue") },
-  { name:"hmpenis", checkbox:document.getElementById("loraHmpenis"), strength:document.getElementById("strengthHmpenis"), value:document.getElementById("strengthHmpenisValue") }
-];
-function getSelectedLoras() { return loraControls.filter(c => c.checkbox.checked).map(c => ({ name:c.name, strength:Number(c.strength.value) })); }
-for (const control of loraControls) control.strength.addEventListener("input", () => { control.value.textContent = Number(control.strength.value).toFixed(2); });
 
 const imageSection = document.getElementById("imageSection");
 const imageInput = document.getElementById("imageInput");
@@ -384,7 +379,7 @@ function formatJobTiming(statusData){
   return "\n\n"+lines.join("\n");
 }
 function updateGenerateButton(){const hasPrompt=promptInput.value.trim().length>0;if(extendBusy||currentMode==="extend"){generateButton.disabled=true;return;}if(currentMode==="image")generateButton.disabled=!originalImage||!hasPrompt;else generateButton.disabled=!hasPrompt;}
-function updateModeUI(){const isExtend=currentMode==="extend",isImageMode=currentMode==="image";imageSection.style.display=isImageMode?"block":"none";for(const id of ["durationSection","promptSection","generateSection"])document.getElementById(id).style.display=isExtend?"none":"block";document.getElementById("loraSection").style.display=modelSelect.value==="erosmax"?"none":"block";document.getElementById("erosLoraSection").style.display=modelSelect.value==="erosmax"?"block":"none";extendModeTab.disabled=false;extendSection.style.display=isExtend?"block":"none";document.getElementById("extendSeconds").disabled=false;document.getElementById("extendPassword").style.display="";document.querySelector("label[for=extendPassword]").style.display="";document.getElementById("r2DiagnoseButton").style.display="";document.getElementById("extendHelp").textContent=modelSelect.value==="erosmax"?"ErosMaxは3・5・8・10秒延長に対応（5秒以外は検証中）。2.8MB以下は直接送信、2.8MB超〜20MiBはR2経由でアップロードします。R2経由ではパスワードが必要です。":"20MiB以下のMP4動画（端末または生成履歴）に対応しています。動画は非公開のR2へ一時アップロードされます。";if(!isImageMode)resolutionInfo.style.display="none";else if(originalImage)updateResolutionInfo();promptInput.placeholder=isImageMode?"画像からどのような動画にしたいか入力してください":"生成したい動画の場面や動きを入力してください";updateGenerateButton();}
+function updateModeUI(){const isExtend=currentMode==="extend",isImageMode=currentMode==="image";imageSection.style.display=isImageMode?"block":"none";for(const id of ["durationSection","promptSection","generateSection"])document.getElementById(id).style.display=isExtend?"none":"block";document.getElementById("erosLoraSection").style.display=modelSelect.value==="erosmax"?"block":"none";document.getElementById("h3LibrarySection").style.display=modelSelect.value==="erosmax"?"none":"block";extendModeTab.disabled=false;extendSection.style.display=isExtend?"block":"none";document.getElementById("extendSeconds").disabled=false;document.getElementById("extendPassword").style.display="";document.querySelector("label[for=extendPassword]").style.display="";document.getElementById("r2DiagnoseButton").style.display="";document.getElementById("extendHelp").textContent=modelSelect.value==="erosmax"?"ErosMaxは3・5・8・10秒延長に対応（5秒以外は検証中）。2.8MB以下は直接送信、2.8MB超〜20MiBはR2経由でアップロードします。R2経由ではパスワードが必要です。":"20MiB以下のMP4動画（端末または生成履歴）に対応しています。動画は非公開のR2へ一時アップロードされます。";if(!isImageMode)resolutionInfo.style.display="none";else if(originalImage)updateResolutionInfo();promptInput.placeholder=isImageMode?"画像からどのような動画にしたいか入力してください":"生成したい動画の場面や動きを入力してください";updateGenerateButton();}
 promptInput.addEventListener("input",updateGenerateButton);
 function calculateH3Resolution(){const BASE_SHORT_EDGE=768,MAX_PIXELS=768*1344,STEP=32;if(!naturalWidth||!naturalHeight)return{width:768,height:768};const aspectRatio=naturalWidth/naturalHeight;let width,height;if(aspectRatio>=1){height=BASE_SHORT_EDGE;width=height*aspectRatio;}else{width=BASE_SHORT_EDGE;height=width/aspectRatio;}if(width*height>MAX_PIXELS){const scale=Math.sqrt(MAX_PIXELS/(width*height));width*=scale;height*=scale;}width=Math.max(STEP,Math.round(width/STEP)*STEP);height=Math.max(STEP,Math.round(height/STEP)*STEP);while(width*height>MAX_PIXELS){if(width>=height)width-=STEP;else height-=STEP;}return{width,height};}
 async function prepareImageForH3(){if(!originalImage)throw new Error("画像が選択されていません。");const resolution=calculateH3Resolution();const canvas=document.createElement("canvas");canvas.width=resolution.width;canvas.height=resolution.height;const ctx=canvas.getContext("2d");if(!ctx)throw new Error("Canvasを取得できませんでした。");ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(originalImage,0,0,resolution.width,resolution.height);return{dataUrl:canvas.toDataURL("image/jpeg",0.92),width:resolution.width,height:resolution.height};}
@@ -393,18 +388,19 @@ imageInput.addEventListener("change",()=>{const file=imageInput.files?.[0];if(!f
 
 generateButton.addEventListener("click",async()=>{
   if(extendBusy)return;
-  const mode=currentMode,duration=Number(durationSelect.value),prompt=promptInput.value.trim(),selectedLoras=getSelectedLoras(),model=modelSelect.value;
+  const mode=currentMode,duration=Number(durationSelect.value),prompt=promptInput.value.trim(),model=modelSelect.value;
+  if(model==="h3"&&getSelectedH3LibraryLoras().length>3){setStatus("H3の追加LoRAは合計3つまでです。","error");return;}
   if(!prompt){setStatus("プロンプトを入力してください。","error");return;}
   savePromptHistory(prompt);
   if(mode==="image"&&!originalImage){setStatus("画像を選択してください。","error");return;}
   generateButton.disabled=true;
-  const controlsToLock=[modelSelect,...erosLoraControls.flatMap(c=>[c.checkbox,c.strength]),imageModeTab,textModeTab,extendModeTab,durationSelect,imageInput,promptInput,...loraControls.flatMap(c=>[c.checkbox,c.strength])];controlsToLock.forEach(c=>{c.disabled=true;});
+  const controlsToLock=[modelSelect,...erosLoraControls.flatMap(c=>[c.checkbox,c.strength]),...h3LibraryControls.flatMap(c=>[c.checkbox,c.strength]),imageModeTab,textModeTab,extendModeTab,durationSelect,imageInput,promptInput];controlsToLock.forEach(c=>{c.disabled=true;});
   videoElement.pause();videoElement.style.display="none";videoElement.removeAttribute("src");videoElement.load();downloadVideoButton.style.display="none";downloadVideoButton.removeAttribute("href");
   try{
     let imageData=null,width=768,height=768;
     if(mode==="image"){setStatus("画像をH3用の解像度に変換しています...");const prepared=await prepareImageForH3();imageData=prepared.dataUrl;width=prepared.width;height=prepared.height;}
     setStatus("動画生成を開始しています。\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さ: ${duration}秒\n`+`生成解像度: ${width} × ${height}`);
-    const requestBody={mode,duration,prompt,width,height,model,loras:selectedLoras};if(model==="erosmax"){requestBody.loras=getSelectedErosLoras();}if(mode==="image")requestBody.image=imageData;
+    const requestBody={mode,duration,prompt,width,height,model,loras:getSelectedH3LibraryLoras()};if(model==="erosmax"){requestBody.loras=getSelectedErosLoras();}if(mode==="image")requestBody.image=imageData;
     const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(requestBody)});const responseText=await response.text();let data;try{data=JSON.parse(responseText);}catch{throw new Error("サーバーからJSONではないレスポンスが返りました。\n"+`HTTP ${response.status}\n`+responseText.slice(0,500));}
     if(!response.ok)throw new Error(data.error||"動画生成ジョブの登録に失敗しました。");if(!data.job_id)throw new Error("RunPodのjob IDを取得できませんでした。");const jobId=data.job_id;
     setStatus("動画生成中です。\n"+`モード: ${mode==="image"?"画像 → 動画":"テキスト → 動画"}\n`+`長さ: ${duration}秒\n`+`解像度: ${width} × ${height}\n`+`Job ID: ${jobId}`);
@@ -564,7 +560,7 @@ extendSubmit.addEventListener("click",async()=>{
     let uploadResponse;try{uploadResponse=await fetch(signingData.upload_url,{method:"PUT",headers:{"Content-Type":"video/mp4"},body:saved.blob});}catch(uploadError){throw new Error("Cloudflare Workerへのアップロード通信に失敗しました（ブラウザ: "+uploadError.message+"）。");}
     if(!uploadResponse.ok)throw new Error("Cloudflare Workerへの動画アップロードに失敗しました。HTTP "+uploadResponse.status);
     setStatus("動画延長を開始しています...");
-    const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:modelSelect.value,mode:"extend",prompt,extend_seconds:seconds,video_key:signingData.key,upload_password:password,loras:modelSelect.value==="erosmax"?[]:getSelectedLoras()})});
+    const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:modelSelect.value,mode:"extend",prompt,extend_seconds:seconds,video_key:signingData.key,upload_password:password,loras:modelSelect.value==="erosmax"?[]:getSelectedH3LibraryLoras()})});
     const data=await response.json();
     if(!response.ok||!data.job_id)throw new Error(data.error||"延長ジョブを開始できませんでした。");
     const jobId=data.job_id;

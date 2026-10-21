@@ -43,23 +43,7 @@ export default async function handler(req, res) {
       10: 244
     };
 
-    const loraDefaults = {
-      hmnsfw: 0.7,
-      free_pussy: 1.0,
-      hmpenis: 1.0
-    };
-
-    // Keep compatibility with older clients that send a single "lora" value.
-    let requestedLoras = loras;
-    if (requestedLoras === undefined) {
-      requestedLoras =
-        lora && lora !== "none"
-          ? [{
-              name: lora,
-              strength: model === "erosmax" ? Number(lora_strength) : loraDefaults[lora]
-            }]
-          : [];
-    }
+    const requestedLoras = loras === undefined ? [] : loras;
 
     // Preserve Eros Max LoRA selections.
     if (!Array.isArray(requestedLoras) || requestedLoras.length > 3) {
@@ -68,14 +52,13 @@ export default async function handler(req, res) {
       });
     }
 
-    const allowedLoras = model === "erosmax" ? {} : loraDefaults;
     if (requestedLoras.length > (model === "erosmax" ? 2 : 3)) return res.status(400).json({error:"追加LoRAの数が多すぎます。"});
     const normalizedLoras = [];
     const selectedLoraNames = new Set();
 
     for (const item of requestedLoras) {
       if (!item || typeof item !== "object" ||
-          !(Object.prototype.hasOwnProperty.call(allowedLoras, item.name) || (model === "erosmax" && typeof item.name === "string" && item.name.startsWith("library:") && validLoraId(item.name.slice(8))))) {
+          !((typeof item.name === "string" && item.name.startsWith("library:") && validLoraId(item.name.slice(8))))) {
         return res.status(400).json({
           error: "追加LoRAの指定が不正です。"
         });
@@ -90,7 +73,7 @@ export default async function handler(req, res) {
 
       const strength =
         item.strength === undefined
-          ? (allowedLoras[item.name] ?? 1.0)
+          ? 1.0
           : Number(item.strength);
 
       if (!Number.isFinite(strength) || strength < 0 || strength > (model === "erosmax" ? 2 : 1.5)) {
@@ -229,12 +212,17 @@ export default async function handler(req, res) {
 
     if (model === "erosmax") {
       if (mode !== "extend") input.action = mode === "image" ? "h3_i2v_generate" : "h3_t2v_generate";
-      input.loras = await Promise.all(normalizedLoras.map(async item => {
+      if (mode === "image") input.image = image;
+    }
+
+    input.loras = await Promise.all(normalizedLoras.map(async item => {
         if (!item.name.startsWith("library:")) return item;
         const id = item.name.slice(8);
         let entry;
         try { entry = await readLora(id); }
         catch { throw new Error("登録LoRAが見つかりません: " + id); }
+        if (!Array.isArray(entry.compatible_models) || !entry.compatible_models.includes(model))
+          throw new Error("選択したモデルに登録されていないLoRAです: " + id);
         if (entry.id !== id || !/^[a-f0-9]{64}$/.test(entry.sha256) ||
             !Number.isSafeInteger(entry.size) || entry.size < 16 || entry.size > 2 * 1024 ** 3)
           throw new Error("登録LoRAのメタデータが不正です。");
@@ -244,8 +232,6 @@ export default async function handler(req, res) {
         }), { expiresIn: 3600 });
         return { ...item, registered: { id, sha256: entry.sha256, size: entry.size, url } };
       }));
-      if (mode === "image") input.image = image;
-    }
 
     // 画像・動画は必要なモードでのみ送信する
     if (model === "h3" && mode === "image") input.image = image;
@@ -283,7 +269,7 @@ export default async function handler(req, res) {
 
     try {
       runpodResponse = await fetch(
-        `https://api.runpod.ai/v2/${model === "erosmax" ? (process.env.VERCEL_ENV === "preview" && ["feature/eros-lora-library", "feature/r2-only-eros-loras"].includes(process.env.VERCEL_GIT_COMMIT_REF) ? "qdu7le19os7loq" : "2gdf5g88h8jsmm") : "18lt7ar99rsrfw"}/run`,
+        `https://api.runpod.ai/v2/${model === "erosmax" ? (process.env.VERCEL_ENV === "preview" && ["feature/eros-lora-library", "feature/r2-only-eros-loras", "feature/shared-h3-eros-lora-library"].includes(process.env.VERCEL_GIT_COMMIT_REF) ? "qdu7le19os7loq" : "2gdf5g88h8jsmm") : (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_GIT_COMMIT_REF === "feature/shared-h3-eros-lora-library" ? "h3uc7tx9jxa2vc" : "18lt7ar99rsrfw")}/run`,
         {
           method: "POST",
           headers: {
