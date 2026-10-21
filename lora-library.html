@@ -104,6 +104,22 @@ $("refresh").onclick=async()=>{
         finally{save.disabled=false;}
       };
       li.append(save);
+      const remove=document.createElement("button");
+      remove.type="button";
+      remove.textContent="このLoRAをR2から削除";
+      remove.style.background="#8b1e1e";
+      remove.style.color="white";
+      remove.onclick=async()=>{
+        if(!confirm("「"+lora.name+"」をR2から完全に削除します。動画生成で使えなくなります。続行しますか？"))return;
+        const typed=prompt("削除を確定するにはLoRAの表示名を正確に入力してください。", "");
+        if(typed!==lora.name){alert("表示名が一致しないため削除しませんでした。");return;}
+        remove.disabled=true;
+        try{
+          await api("lora-delete",{id:lora.id,confirmName:typed});
+          $("refresh").click();
+        }catch(error){alert("削除失敗: "+error.message);remove.disabled=false;}
+      };
+      li.append(remove);
       $("list").append(li);
     }
     if(!data.loras?.length)$("list").textContent="登録済みLoRAはありません。";
