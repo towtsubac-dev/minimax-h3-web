@@ -1,4 +1,4 @@
-import { verifyLoraAdminPassword, listLoras, loraStore, loraKeys, validLoraId, saveLoraMetadata, readLora, updateLoraModels } from "./_lora.js";
+import { verifyLoraAdminPassword, listLoras, loraStore, loraKeys, validLoraId, saveLoraMetadata, readLora, updateLoraModels, deleteLora } from "./_lora.js";
 import { randomUUID, createHash } from "node:crypto";
 import { CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, HeadObjectCommand, AbortMultipartUploadCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -38,6 +38,26 @@ async function route_lora_models(req, res) {
 }
 
 
+
+// lora-delete: remove both the R2 safetensors object and its library metadata.
+async function route_lora_delete(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!verifyLoraAdminPassword(req.body?.password)) return res.status(401).json({ error: "Unauthorized" });
+  const { id, confirmName } = req.body || {};
+  if (!validLoraId(id) || typeof confirmName !== "string")
+    return res.status(400).json({ error: "Invalid LoRA deletion request" });
+  try {
+    const existing = await readLora(id);
+    if (existing.name !== confirmName) return res.status(409).json({ error: "LoRA name confirmation mismatch" });
+    await deleteLora(id);
+    return res.status(200).json({ ok: true, id });
+  } catch (error) {
+    console.error("LoRA deletion failed", error);
+    return res.status(500).json({ error: "LoRAの削除に失敗しました。再読み込みして状態を確認してください。" });
+  }
+}
+
 // lora-upload-start
 
 
@@ -48,8 +68,8 @@ async function route_lora_upload_start(req, res) {
   if (!verifyLoraAdminPassword(req.body?.password)) return res.status(401).json({ error: "Unauthorized" });
   const name = req.body?.name, size = req.body?.size;
   if (typeof name !== "string" || !name.trim() || name.length > 100 ||
-      !Number.isSafeInteger(size) || size < 16 || size > 256 * 1024 ** 2)
-    return res.status(400).json({ error: "Invalid LoRA name or size (max 256 MiB)" });
+      !Number.isSafeInteger(size) || size < 16 || size > 512 * 1024 ** 2)
+    return res.status(400).json({ error: "Invalid LoRA name or size (max 512 MiB)" });
   try {
     const id = randomUUID(), key = loraKeys(id).model;
     const { client, bucket } = loraStore();
@@ -99,7 +119,7 @@ async function route_lora_upload_finish(req, res) {
   if (!verifyLoraAdminPassword(req.body?.password)) return res.status(401).json({ error: "Unauthorized" });
   const { id, uploadId, parts, size } = req.body || {};
   if (!validLoraId(id) || typeof uploadId !== "string" || !uploadId || uploadId.length > 1024 ||
-      !Number.isSafeInteger(size) || size < 16 || size > 256 * 1024 ** 2 ||
+      !Number.isSafeInteger(size) || size < 16 || size > 512 * 1024 ** 2 ||
       !Array.isArray(parts) || parts.length < 1 || parts.length > 128 ||
       parts.some((p, i) => !p || p.PartNumber !== i + 1 || typeof p.ETag !== "string" ||
         !/^"?[a-fA-F0-9]{32}"?$/.test(p.ETag)))
@@ -148,7 +168,7 @@ async function route_lora_upload_abort(req, res) {
 
 const MAX_HEADER_BYTES = 16 * 1024 * 1024;
 // Full-object hashing remains unsuitable for Vercel execution limits on multi-GB files.
-const MAX_BYTES = 256 * 1024 ** 2;
+const MAX_BYTES = 512 * 1024 ** 2;
 
 function inspectHeader(buffer) {
   if (buffer.length < 8) throw new Error("Safetensors header is missing");
@@ -401,6 +421,7 @@ async function route_lora_options(req, res) {
 const routes = {
   "list": route_lora_list,
   "models": route_lora_models,
+  "delete": route_lora_delete,
   "upload-start": route_lora_upload_start,
   "upload-part": route_lora_upload_part,
   "upload-finish": route_lora_upload_finish,
