@@ -104,6 +104,23 @@ $("refresh").onclick=async()=>{
         finally{save.disabled=false;}
       };
       li.append(save);
+      const remove=document.createElement("button");
+      remove.type="button";
+      remove.textContent="このLoRAを本番から削除";
+      remove.style.background="#fee2e2";
+      remove.style.color="#991b1b";
+      remove.onclick=async()=>{
+        if(!confirm("本番R2から次のLoRAを完全削除します。\\n"+lora.name+"\\n\\n元に戻せません。続けますか？"))return;
+        const typed=prompt("誤削除防止のため、削除するLoRAの名前を正確に入力してください。\\n"+lora.name);
+        if(typed!==lora.name){alert("名前が一致しないため削除しませんでした。");return;}
+        remove.disabled=true;
+        try{
+          await api("lora-delete",{id:lora.id,confirmName:lora.name});
+          li.remove();
+          alert("本番ライブラリから削除しました。動画生成画面を再読み込みしてください。");
+        }catch(error){alert("削除失敗: "+error.message);remove.disabled=false;}
+      };
+      li.append(remove);
       $("list").append(li);
     }
     if(!data.loras?.length)$("list").textContent="登録済みLoRAはありません。";
